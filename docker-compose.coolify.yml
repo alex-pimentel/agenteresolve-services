@@ -1,0 +1,82 @@
+# Coolify / Docker Compose stack for the AI services platform.
+#
+# Redis, Postgres, R2 and all inference endpoints are EXTERNAL, provided by env.
+# This file intentionally defines no datastores: point REDIS_URL at a managed
+# Redis and the workers become fully portable.
+#
+#   docker compose -f docker-compose.coolify.yml up --build
+#
+# In Coolify, deploy this compose file as one application and set the env vars
+# from .env (Coolify secrets), or connect a managed Redis and set REDIS_URL.
+
+name: agenteresolve-services
+
+x-worker: &worker
+  build:
+    context: .
+    dockerfile: Dockerfile.worker
+  env_file:
+    - .env
+  restart: unless-stopped
+  volumes:
+    - model-cache:/home/app/.cache
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker-text:
+    <<: *worker
+    command:
+      - celery
+      - -A
+      - worker.celery_app:celery_app
+      - worker
+      - -Q
+      - text
+      - --concurrency=1
+      - --loglevel=INFO
+
+  worker-vision:
+    <<: *worker
+    command:
+      - celery
+      - -A
+      - worker.celery_app:celery_app
+      - worker
+      - -Q
+      - vision
+      - --concurrency=1
+      - --loglevel=INFO
+
+  worker-audio:
+    <<: *worker
+    command:
+      - celery
+      - -A
+      - worker.celery_app:celery_app
+      - worker
+      - -Q
+      - audio
+      - --concurrency=1
+      - --loglevel=INFO
+
+volumes:
+  model-cache:

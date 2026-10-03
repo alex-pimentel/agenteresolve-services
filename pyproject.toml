@@ -1,0 +1,50 @@
+[project]
+name = "agenteresolve-services"
+version = "0.1.0"
+description = "Unified AI services platform: gateway + workers + shared packages"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/gateway", "apps/worker", "packages/common"]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/common/tests", "apps/gateway/tests", "apps/worker/tests"]
+addopts = "-q"
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["apps", "packages"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "apps/gateway:apps/worker:packages/common"
+packages = ["common", "gateway", "worker"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*", "celery.*", "redis.*"]
+ignore_missing_imports = true

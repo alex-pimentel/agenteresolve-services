@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "common"
+version = "0.1.0"
+description = "Shared job model, object storage and provider abstraction"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "boto3>=1.34",
+    "httpx>=0.27",
+    "redis>=5.0",
+    "celery[redis]>=5.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["common"]
