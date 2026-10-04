@@ -16,7 +16,14 @@ import { JobResult } from '../components/JobResult';
 import { StateMessage } from '../components/StateMessage';
 import { ToolInput } from '../components/ToolInput';
 import { formatBytes, getTool, type ToolConfig } from '../data/tools';
-import { createFileJob, createTextJob, isUnimplemented, pollJob, type Job } from '../lib/api';
+import {
+  createFileJob,
+  createTextJob,
+  isProviderUnavailable,
+  isUnimplemented,
+  pollJob,
+  type Job,
+} from '../lib/api';
 import { CLERK_PUBLISHABLE_KEY } from '../lib/env';
 import { SERVICE_NAV } from '../lib/nav';
 import { LouderPage } from './LouderPage';
@@ -81,6 +88,10 @@ function GatewayToolPage({ tool }: { tool: ToolConfig }) {
       if (isUnimplemented(err)) {
         setBetaNotice(
           'Esta ferramenta está em beta e o endpoint ainda não está disponível no gateway.',
+        );
+      } else if (isProviderUnavailable(err)) {
+        setError(
+          'Serviço temporariamente indisponível: o provedor de IA não está configurado no servidor. Tente novamente mais tarde.',
         );
       } else {
         setError(err instanceof Error ? err.message : 'Erro inesperado ao processar.');

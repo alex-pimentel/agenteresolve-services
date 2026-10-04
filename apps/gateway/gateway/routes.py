@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 from common.config import get_settings
 from common.job import JobStatus
 from common.jobs import get_job_store
+from common.sessions import get_session_store
 from common.storage import get_object_store
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from gateway.auth import get_optional_user
 from gateway.jobs import create_tool_job
 from gateway.registry import resolve
+from gateway.schemas import AskRequest, VoiceChatSessionRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -24,6 +27,90 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@router.post("/api/{slug}/session", tags=["sessions"])
+def create_session(
+    slug: str,
+    request: Request,
+    _user: dict[str, Any] | None = Depends(get_optional_user),
+) -> dict[str, Any]:
+    resolve(slug)
+    session_id = uuid.uuid4().hex
+    store = get_session_store()
+    store.create(session_id, slug)
+    return {"session_id": session_id, "tool": slug, "status": "ready"}
+
+
+@router.get("/api/{slug}/session/{session_id}", tags=["sessions"])
+def get_session(
+    slug: str,
+    session_id: str,
+    _user: dict[str, Any] | None = Depends(get_optional_user),
+) -> dict[str, Any]:
+    resolve(slug)
+    session = get_session_store().get(session_id)
+    if session is None or session.kind != slug:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session '{session_id}' not found for tool '{slug}'",
+        )
+    return {"session_id": session_id, "tool": slug, "status": "ready"}
+
+
+@router.post("/api/voicechat/session", tags=["sessions"])
+def create_voicechat_session(
+    body: VoiceChatSessionRequest | None = None,
+    _user: dict[str, Any] | None = Depends(get_optional_user),
+) -> dict[str, Any]:
+    session_id = uuid.uuid4().hex
+    payload = body or VoiceChatSessionRequest()
+    get_session_store().create(
+        session_id, "voicechat", history=[], persona=payload.persona, lang=payload.lang
+    )
+    return {"session_id": session_id, "tool": "voicechat", "persona": payload.persona}
+
+
+@router.post("/api/askyourdocs/session", tags=["sessions"])
+def create_ask_session(
+    _user: dict[str, Any] | None = Depends(get_optional_user),
+) -> dict[str, Any]:
+    session_id = uuid.uuid4().hex
+    get_session_store().create(session_id, "askyourdocs", records=[])
+    return {"session_id": session_id, "tool": "askyourdocs", "status": "ready"}
+
+
+@router.post(
+    "/api/{slug}/{session_id}/ask",
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["sessions"],
+)
+def ask_session(
+    slug: str,
+    session_id: str,
+    body: AskRequest,
+    _user: dict[str, Any] | None = Depends(get_optional_user),
+) -> dict[str, Any]:
+    spec = resolve(slug)
+    if slug not in ("askyourdocs", "datachat"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tool '{slug}' has no ask endpoint",
+        )
+    if spec.queue is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a gateway tool")
+    session = get_session_store().get(session_id)
+    if session is None or session.kind != slug:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session '{session_id}' not found for tool '{slug}'",
+        )
+    content = body.question.encode("utf-8")
+    params = {"question": body.question, "session_id": session_id}
+    job = create_tool_job(
+        slug=slug, params=params, content=content, content_type="text/plain; charset=utf-8"
+    )
+    return {"task_id": job.task_id, "tool": slug, "status": job.status.value}
+
+
 @router.post("/api/{slug}/", status_code=status.HTTP_202_ACCEPTED, tags=["jobs"])
 async def create_job(
     slug: str,
@@ -32,14 +119,17 @@ async def create_job(
 ) -> dict[str, str]:
     spec = resolve(slug)
     if not spec.implemented:
-        reason = (
-            "client-side tool; no gateway endpoint"
-            if spec.category == "client"
-            else "registered but not implemented yet"
-        )
+        if spec.category == "client":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Tool '{slug}' is client-side only and has no gateway endpoint. "
+                    f"Run it in the browser instead."
+                ),
+            )
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"Tool '{slug}' is {reason}.",
+            detail=f"Tool '{slug}' is registered but not implemented yet.",
         )
 
     params, content, content_type = await _parse_input(request, spec.max_bytes)
@@ -60,6 +150,17 @@ def get_job(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task '{task_id}' not found for tool '{slug}'",
+        )
+
+    if job.status is JobStatus.error and job.error_code == "provider_unavailable":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "provider_unavailable",
+                "message": job.error,
+                "tool": slug,
+                "task_id": task_id,
+            },
         )
 
     if job.status is JobStatus.done and job.result_url:

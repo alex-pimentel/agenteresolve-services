@@ -62,7 +62,7 @@ def test_process_job_marks_error_on_bad_input(
     assert job_store.get("t2").status is JobStatus.error  # type: ignore[union-attr]
 
 
-def test_process_job_unknown_slug_marks_error(
+def test_process_job_missing_payload_marks_error(
     stores: tuple[InMemoryJobStore, InMemoryObjectStore],
 ) -> None:
     job_store, _ = stores
@@ -71,4 +71,4 @@ def test_process_job_unknown_slug_marks_error(
     job = process_job("seo", "t3")
 
     assert job.status is JobStatus.error
-    assert "handler" in (job.error or "").lower()
+    assert job.error_code == "processing_error"

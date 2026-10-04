@@ -9,6 +9,7 @@ from typing import Any
 from common.job import Job, JobStatus
 from common.jobs import get_job_store
 from common.providers import factory
+from common.providers.base import ProviderUnavailable
 from common.storage import ObjectStore, get_object_store
 
 from worker.handlers import get_handler
@@ -69,6 +70,15 @@ def process_job(slug: str, task_id: str) -> Job:
             progress=100,
             result_url=result.key,
             error=None,
+            error_code=None,
+        )
+    except ProviderUnavailable as exc:
+        logger.warning("Tool '%s' job '%s' has no provider: %s", slug, task_id, exc)
+        updated = job_store.update(
+            task_id,
+            status=JobStatus.error,
+            error=f"provider_unavailable: {exc}",
+            error_code="provider_unavailable",
         )
     except Exception as exc:  # noqa: BLE001 - reported on the job
         logger.exception("Tool '%s' job '%s' failed", slug, task_id)
@@ -76,6 +86,7 @@ def process_job(slug: str, task_id: str) -> Job:
             task_id,
             status=JobStatus.error,
             error=f"{type(exc).__name__}: {exc}",
+            error_code="processing_error",
         )
 
     if updated is None:

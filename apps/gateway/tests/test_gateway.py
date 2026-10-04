@@ -40,15 +40,10 @@ def test_unknown_slug_returns_404(client: TestClient) -> None:
     assert client.get("/api/nope/whatever").status_code == 404
 
 
-def test_unimplemented_tool_returns_501(client: TestClient) -> None:
-    response = client.post("/api/feedback/", json={"text": "x"})
-    assert response.status_code == 501
-    assert "not implemented" in response.json()["detail"].lower()
-
-
-def test_client_side_tool_returns_501(client: TestClient) -> None:
+def test_client_side_tool_returns_400(client: TestClient) -> None:
     response = client.post("/api/louder/", json={"text": "x"})
-    assert response.status_code == 501
+    assert response.status_code == 400
+    assert "client-side" in response.json()["detail"].lower()
 
 
 def test_translate_full_job_flow(client: TestClient) -> None:

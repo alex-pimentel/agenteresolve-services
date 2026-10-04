@@ -19,3 +19,4 @@ class Job(BaseModel):
     progress: int = Field(default=0, ge=0, le=100)
     result_url: str | None = None
     error: str | None = None
+    error_code: str | None = None

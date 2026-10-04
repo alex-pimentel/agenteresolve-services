@@ -22,6 +22,7 @@ from common.providers.base import (
 from common.providers.llm import OPENROUTER_BASE_URL, LocalLLM, OpenAICompatibleLLM
 
 _llm_override: LLMProvider | None = None
+_overrides: dict[str, Any] = {}
 
 
 def set_llm_provider(provider: LLMProvider | None) -> None:
@@ -30,9 +31,18 @@ def set_llm_provider(provider: LLMProvider | None) -> None:
     _llm_override = provider
 
 
+def set_provider(capability: str, provider: Any | None) -> None:
+    """Override any capability provider (used by tests and local wiring)."""
+    if provider is None:
+        _overrides.pop(capability, None)
+    else:
+        _overrides[capability] = provider
+
+
 def reset_providers() -> None:
     global _llm_override
     _llm_override = None
+    _overrides.clear()
     get_settings.cache_clear()
 
 
@@ -54,15 +64,19 @@ def get_llm_provider() -> LLMProvider:
 
 
 def get_embeddings_provider() -> EmbeddingsProvider:
+    if "embeddings" in _overrides:
+        return _overrides["embeddings"]
     settings = get_settings()
     if settings.embeddings_base_url:
         return caps.RemoteEmbeddingsProvider(
             settings.embeddings_base_url, settings.embeddings_api_key, settings.embeddings_model
         )
-    return caps.LocalEmbeddingsProvider(settings.embeddings_model)
+    return caps.LocalEmbeddingsProvider(model=settings.embeddings_model)
 
 
 def get_ocr_provider() -> OcrProvider:
+    if "ocr" in _overrides:
+        return _overrides["ocr"]
     settings = get_settings()
     return _select(
         settings.ocr_url,
@@ -73,6 +87,8 @@ def get_ocr_provider() -> OcrProvider:
 
 
 def get_vision_provider() -> VisionProvider:
+    if "vision" in _overrides:
+        return _overrides["vision"]
     settings = get_settings()
     return _select(
         settings.vision_url,
@@ -83,6 +99,8 @@ def get_vision_provider() -> VisionProvider:
 
 
 def get_audio_provider() -> AudioProvider:
+    if "audio" in _overrides:
+        return _overrides["audio"]
     settings = get_settings()
     return _select(
         settings.audio_url,
@@ -93,6 +111,8 @@ def get_audio_provider() -> AudioProvider:
 
 
 def get_tts_provider() -> TtsProvider:
+    if "tts" in _overrides:
+        return _overrides["tts"]
     settings = get_settings()
     return _select(
         settings.tts_url,

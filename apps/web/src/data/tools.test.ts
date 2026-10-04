@@ -49,11 +49,12 @@ describe('tool catalogue', () => {
     expect(getTool('louder')?.beta).toBe(false);
   });
 
-  it('marks every stubbed gateway tool as beta', () => {
-    const stubbed = TOOLS.filter((tool) => tool.route === 'gateway' && !tool.implemented);
-    expect(stubbed.length).toBeGreaterThan(0);
-    for (const tool of stubbed) {
-      expect(tool.beta).toBe(true);
+  it('marks every gateway tool as implemented (providers may be unavailable at runtime)', () => {
+    for (const tool of TOOLS) {
+      if (tool.route === 'gateway') {
+        expect(tool.implemented).toBe(true);
+        expect(tool.beta).toBe(false);
+      }
     }
   });
 

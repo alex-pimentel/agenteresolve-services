@@ -107,18 +107,16 @@ describe('ToolPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('endpoint quebrou');
   });
 
-  it('handles 501 for a beta tool with a clear notice', async () => {
-    createTextJobMock.mockRejectedValue(new ApiError('not implemented', 501));
+  it('shows a clear notice when the AI provider is unavailable (503)', async () => {
+    createTextJobMock.mockRejectedValue(new ApiError('provider unavailable', 503));
 
     const user = userEvent.setup();
     renderSlug('feedback');
 
-    expect(screen.getByText('Beta')).toBeInTheDocument();
-
     await user.type(screen.getByLabelText('Texto'), 'Avaliação');
     await user.click(screen.getByRole('button', { name: /processar/i }));
 
-    expect(await screen.findByText(/em beta e o endpoint/i)).toBeInTheDocument();
+    expect(await screen.findByText(/provedor de ia não está configurado/i)).toBeInTheDocument();
   });
 
   it('uploads a file for file-based tools', async () => {

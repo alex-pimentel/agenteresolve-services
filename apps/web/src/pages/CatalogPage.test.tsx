@@ -32,9 +32,9 @@ describe('CatalogPage', () => {
     expect(screen.getByRole('link', { name: /louder/i })).toHaveAttribute('href', '/louder');
   });
 
-  it('shows beta badges for stubbed tools', () => {
+  it('renders no beta badges now that every gateway tool is implemented', () => {
     renderPage();
-    expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Beta')).not.toBeInTheDocument();
     expect(screen.getAllByText('No navegador').length).toBeGreaterThan(0);
   });
 });

@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     tts_url: str | None = None
     tts_key: str | None = None
 
+    # Outbound fetch guard (SEO URL import) -----------------------------------
+    fetch_timeout: float = 10.0
+    ssrf_block_private: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

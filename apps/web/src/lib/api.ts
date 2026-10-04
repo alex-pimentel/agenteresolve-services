@@ -36,6 +36,10 @@ export function isUnimplemented(error: unknown): boolean {
   return error instanceof ApiError && error.status === 501;
 }
 
+export function isProviderUnavailable(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 503;
+}
+
 function apiUrl(path: string): string {
   return `${API_BASE}${path}`;
 }

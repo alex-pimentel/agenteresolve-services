@@ -1,9 +1,9 @@
 """Remote and local implementations for non-LLM capabilities.
 
 The interface is what matters for portability. Remote variants proxy to a service by URL
-and key; local variants would load a model into the worker container. Only the LLM path is
-exercised end-to-end by the reference tool (``translate``); the other capabilities expose
-their contracts and raise a clear :class:`ProviderUnavailable` until a backend is wired.
+and key; local variants are defined in :mod:`common.providers.local` and lazily import
+their heavy dependencies inside each method. The factory picks the remote path when
+``*_URL`` is set, otherwise the local path.
 """
 
 from __future__ import annotations
@@ -13,9 +13,15 @@ import httpx
 from common.providers.base import (
     Detection,
     OcrBlock,
-    ProviderUnavailable,
     Transcription,
     TranscriptSegment,
+)
+from common.providers.local import (
+    HashingEmbeddingsProvider,
+    LocalAudioProvider,
+    LocalOcrProvider,
+    LocalTtsProvider,
+    LocalVisionProvider,
 )
 
 
@@ -61,12 +67,8 @@ class RemoteEmbeddingsProvider(_Base):
         return [item["embedding"] for item in data["data"]]
 
 
-class LocalEmbeddingsProvider(_Base):
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        raise ProviderUnavailable(
-            "No embeddings backend configured. Set EMBEDDINGS_BASE_URL/EMBEDDINGS_API_KEY "
-            "or install a local embeddings model."
-        )
+class LocalEmbeddingsProvider(HashingEmbeddingsProvider):
+    """Deterministic offline embeddings used when ``EMBEDDINGS_BASE_URL`` is unset."""
 
 
 # --- OCR -------------------------------------------------------------------------
@@ -87,14 +89,6 @@ class RemoteOcrProvider(_Base):
             response.raise_for_status()
             payload = response.json()
         return [OcrBlock(**block) for block in payload.get("blocks", [])]
-
-
-class LocalOcrProvider(_Base):
-    def extract(self, data: bytes, *, content_type: str, lang: str | None = None) -> list[OcrBlock]:
-        raise ProviderUnavailable(
-            "No OCR backend configured. Set OCR_URL/OCR_KEY or install a local "
-            "Tesseract/PaddleOCR backend."
-        )
 
 
 # --- vision ----------------------------------------------------------------------
@@ -129,16 +123,6 @@ class RemoteVisionProvider(_Base):
             response.raise_for_status()
             payload = response.json()
         return [Detection(**item) for item in payload.get("detections", [])]
-
-
-class LocalVisionProvider(_Base):
-    def caption(self, data: bytes, *, content_type: str) -> str:
-        raise ProviderUnavailable("No vision backend configured. Set VISION_URL/VISION_KEY.")
-
-    def detect(
-        self, data: bytes, *, content_type: str, labels: list[str] | None = None
-    ) -> list[Detection]:
-        raise ProviderUnavailable("No vision backend configured. Set VISION_URL/VISION_KEY.")
 
 
 # --- audio -----------------------------------------------------------------------
@@ -180,20 +164,6 @@ class RemoteAudioProvider(_Base):
             return response.content
 
 
-class LocalAudioProvider(_Base):
-    def transcribe(
-        self, data: bytes, *, content_type: str, lang: str | None = None
-    ) -> Transcription:
-        raise ProviderUnavailable(
-            "No audio backend configured. Set AUDIO_URL/AUDIO_KEY or install faster-whisper."
-        )
-
-    def enhance(self, data: bytes, *, content_type: str, mode: str = "denoise") -> bytes:
-        raise ProviderUnavailable(
-            "No audio backend configured. Set AUDIO_URL/AUDIO_KEY or install a local model."
-        )
-
-
 # --- TTS -------------------------------------------------------------------------
 
 
@@ -217,20 +187,6 @@ class RemoteTtsProvider(_Base):
             )
             response.raise_for_status()
             return response.content
-
-
-class LocalTtsProvider(_Base):
-    def synthesize(
-        self,
-        text: str,
-        *,
-        voice: str | None = None,
-        lang: str | None = None,
-        speed: float = 1.0,
-    ) -> bytes:
-        raise ProviderUnavailable(
-            "No TTS backend configured. Set TTS_URL/TTS_KEY or install Piper locally."
-        )
 
 
 __all__ = [

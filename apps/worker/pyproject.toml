@@ -13,6 +13,18 @@ dependencies = [
     "httpx>=0.27",
 ]
 
+# Heavy model/document libraries are NOT declared as dependencies: they are imported
+# lazily inside handlers and installed per-worker-image (or replaced by the matching
+# remote *_URL provider). This keeps the base image small and import-time light.
+# Examples (install in the worker image as needed):
+#   pip install pypdf python-docx      # docuextract / contracts native text
+#   pip install pandas openpyxl        # datachat
+#   pip install Pillow numpy           # anonymize pixel redaction
+#   pip install pytesseract            # local OCR
+#   pip install faster-whisper         # local transcribe/audio-enhance
+#   pip install piper-tts              # local TTS
+#   pip install transformers ultralytics  # local caption/detect
+
 [tool.uv.sources]
 common = { workspace = true }
 
