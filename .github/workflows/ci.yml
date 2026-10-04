@@ -19,6 +19,7 @@ jobs:
       coverage: true
       run_e2e: true
   security:
+    needs: [quality, web]
     permissions:
       contents: read
       security-events: write
