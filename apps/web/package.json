@@ -22,7 +22,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@agenteresolve/ui": "github:alex-pimentel/agenteresolve-ui",
+    "@agenteresolve/ui": "git+https://github.com/alex-pimentel/agenteresolve-ui.git",
     "lucide-react": "^1.51.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
