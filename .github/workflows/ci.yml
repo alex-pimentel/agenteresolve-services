@@ -11,6 +11,13 @@ jobs:
       working_directory: .
       coverage: true
       coverage_threshold: 79
+  web:
+    uses: alex-pimentel/agenteresolve-ci/.github/workflows/node-quality.yml@main
+    with:
+      working_directory: apps/web
+      package_manager: npm
+      coverage: true
+      run_e2e: true
   security:
     permissions:
       contents: read

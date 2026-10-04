@@ -21,3 +21,19 @@ repos:
       - id: ruff
         args: ['--fix']
       - id: ruff-format
+
+  # Frontend (apps/web) — requires `npm ci` in apps/web first.
+  - repo: local
+    hooks:
+      - id: web-format
+        name: web format (prettier)
+        entry: bash -c 'cd apps/web && npm run format:check'
+        language: system
+        files: ^apps/web/.*\.(ts|tsx|js|jsx|json|css|md|ya?ml)$
+        pass_filenames: false
+      - id: web-lint
+        name: web lint (eslint)
+        entry: bash -c 'cd apps/web && npm run lint'
+        language: system
+        files: ^apps/web/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false

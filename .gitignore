@@ -17,6 +17,15 @@ venv/
 .coverage
 htmlcov/
 
+# Node / frontend
+node_modules/
+.vite/
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+*.tsbuildinfo
+
 # Secrets / local env
 .env
 .env.*

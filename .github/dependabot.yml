@@ -11,6 +11,17 @@ updates:
       python-prod:
         dependency-type: production
 
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      web-dev:
+        dependency-type: development
+      web-prod:
+        dependency-type: production
+
   - package-ecosystem: docker
     directory: /
     schedule:

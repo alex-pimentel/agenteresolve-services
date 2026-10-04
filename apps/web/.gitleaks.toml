@@ -1,0 +1,15 @@
+title = "Agenteresolve web gitleaks config"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Web allowlist"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)coverage/''',
+  '''(^|/)playwright-report/''',
+  '''(^|/)test-results/''',
+  '''\.env\.example$''',
+  '''package-lock\.json$''',
+]
