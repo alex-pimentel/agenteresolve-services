@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock .python-version ./
 COPY packages ./packages
 COPY apps ./apps
 
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --all-packages
 
 ENV PATH="/app/.venv/bin:$PATH"
 
