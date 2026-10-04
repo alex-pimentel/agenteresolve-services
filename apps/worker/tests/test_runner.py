@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterator
 
 import pytest
 from common.job import Job, JobStatus
@@ -10,7 +11,7 @@ from worker.runner import process_job
 
 
 @pytest.fixture
-def stores() -> tuple[InMemoryJobStore, InMemoryObjectStore]:
+def stores() -> Iterator[tuple[InMemoryJobStore, InMemoryObjectStore]]:
     job_store = InMemoryJobStore()
     object_store = InMemoryObjectStore()
     set_job_store(job_store)

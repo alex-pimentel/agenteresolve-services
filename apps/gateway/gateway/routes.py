@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from common.config import get_settings
@@ -15,6 +16,7 @@ from gateway.jobs import create_tool_job
 from gateway.registry import resolve
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/health", tags=["meta"])
@@ -68,7 +70,7 @@ def get_job(
             )
             job = job.model_copy(update={"result_url": presigned})
         except Exception:  # noqa: BLE001 - fall back to the stored key
-            pass
+            logger.debug("Could not presign result URL for job %s", job.task_id, exc_info=True)
 
     return job.model_dump(mode="json")
 

@@ -1,0 +1,18 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    uses: alex-pimentel/agenteresolve-ci/.github/workflows/python-quality.yml@main
+    with:
+      working_directory: .
+      coverage: true
+      coverage_threshold: 79
+  security:
+    permissions:
+      contents: read
+      security-events: write
+    uses: alex-pimentel/agenteresolve-ci/.github/workflows/security-scan.yml@main

@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 import pytest
 from common.jobs import InMemoryJobStore, set_job_store
 from common.providers import factory
@@ -8,7 +10,7 @@ from gateway.main import create_app
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client() -> Iterator[TestClient]:
     object_store = InMemoryObjectStore()
     job_store = InMemoryJobStore()
     set_object_store(object_store)
@@ -90,3 +92,45 @@ def test_translate_multipart_upload(client: TestClient) -> None:
     task_id = created.json()["task_id"]
     job = client.get(f"/api/translate/{task_id}").json()
     assert job["status"] == "done"
+
+
+def test_translate_rejects_non_json_body(client: TestClient) -> None:
+    response = client.post(
+        "/api/translate/",
+        content=b"not json at all",
+        headers={"content-type": "text/plain"},
+    )
+    assert response.status_code == 422
+
+
+def test_translate_rejects_json_array(client: TestClient) -> None:
+    response = client.post("/api/translate/", json=["not", "an", "object"])
+    assert response.status_code == 422
+
+
+def test_translate_multipart_requires_file_or_text(client: TestClient) -> None:
+    response = client.post(
+        "/api/translate/",
+        data={"target": "pt"},
+        files={"other": ("x.txt", b"ignored", "text/plain")},
+    )
+    assert response.status_code == 422
+
+
+def test_translate_rejects_oversized_input(client: TestClient) -> None:
+    oversized = b"x" * (10 * 1024 * 1024 + 1)
+    response = client.post(
+        "/api/translate/",
+        data={"target": "pt"},
+        files={"file": ("big.txt", oversized, "text/plain")},
+    )
+    assert response.status_code == 413
+
+
+def test_anonymous_request_allowed_when_auth_unconfigured(client: TestClient) -> None:
+    response = client.post(
+        "/api/translate/",
+        json={"text": "Hello", "target": "pt"},
+        headers={"Authorization": "Bearer not-a-real-token"},
+    )
+    assert response.status_code == 202

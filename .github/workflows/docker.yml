@@ -1,0 +1,16 @@
+name: Docker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-scan:
+    permissions:
+      contents: read
+      security-events: write
+    uses: alex-pimentel/agenteresolve-ci/.github/workflows/docker-build-scan.yml@main
+    with:
+      image_name: agenteresolve-services-gateway
+      dockerfile: Dockerfile

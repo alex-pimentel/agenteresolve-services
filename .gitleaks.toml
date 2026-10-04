@@ -1,0 +1,20 @@
+title = "Agenteresolve gitleaks config"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)vendor/''',
+  '''(^|/)\.venv/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)\.git/''',
+  '''\.env\.example$''',
+  '''package-lock\.json$''',
+  '''pnpm-lock\.yaml$''',
+  '''composer\.lock$''',
+  '''uv\.lock$''',
+  '''poetry\.lock$''',
+]
