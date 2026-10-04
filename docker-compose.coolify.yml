@@ -7,7 +7,9 @@
 #   docker compose -f docker-compose.coolify.yml up --build
 #
 # In Coolify, deploy this compose file as one application and set the env vars
-# from .env (Coolify secrets), or connect a managed Redis and set REDIS_URL.
+# in the app's Environment Variables (Coolify injects them as container env).
+# Do NOT rely on a committed `.env` (it is generated from .env.example for local
+# runs only); `env_file` is marked optional so the compose also parses without it.
 
 name: agenteresolve-services
 
@@ -16,7 +18,8 @@ x-worker: &worker
     context: .
     dockerfile: Dockerfile.worker
   env_file:
-    - .env
+    - path: .env
+      required: false
   restart: unless-stopped
   volumes:
     - model-cache:/home/app/.cache
@@ -27,7 +30,8 @@ services:
       context: .
       dockerfile: Dockerfile
     env_file:
-      - .env
+      - path: .env
+        required: false
     restart: unless-stopped
     ports:
       - "8000:8000"
