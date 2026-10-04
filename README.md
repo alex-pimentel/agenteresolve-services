@@ -1,5 +1,9 @@
 # Agenteresolve AI Services
 
+[![CI](https://github.com/alex-pimentel/agenteresolve-services/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-pimentel/agenteresolve-services/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/alex-pimentel/agenteresolve-services)](https://github.com/alex-pimentel/agenteresolve-services/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Unified AI services platform: a single **FastAPI gateway**, one **Celery worker image** with
 `text` / `vision` / `audio` queues, and a shared **`common`** package holding the job model,
 object storage and provider abstraction.
@@ -114,6 +118,26 @@ The compose file defines `gateway` + `worker-text` + `worker-vision` + `worker-a
 (`--concurrency=1`). Redis/Postgres/R2/inference are **not** defined here — supply
 `REDIS_URL` and the rest via env (Coolify secrets). A `model-cache` volume keeps downloaded
 models between restarts.
+
+## Frontend (`apps/web`)
+
+The unified React frontend lives in `apps/web`. It consumes the shared design system via the
+git dependency `@agenteresolve/ui` (`github:alex-pimentel/agenteresolve-ui#v0.1.0`), which is
+built on install by the package's `prepare` script.
+
+```bash
+cd apps/web
+npm ci
+npm run build        # static output in apps/web/dist
+```
+
+### Deploy (Cloudflare Pages)
+
+```bash
+npx wrangler pages deploy apps/web/dist --project-name=agenteresolve-services
+```
+
+Set `VITE_CLERK_PUBLISHABLE_KEY` (optional) in the Pages project for the shared login.
 
 ## Environment
 
