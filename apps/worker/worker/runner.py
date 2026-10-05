@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
+from common.billing import BillingError, get_billing_client
 from common.job import Job, JobStatus
 from common.jobs import get_job_store
 from common.providers import factory
@@ -57,6 +59,7 @@ def process_job(slug: str, task_id: str) -> Job:
 
     job_store.update(task_id, status=JobStatus.processing, progress=5)
     object_store = get_object_store()
+    started = time.monotonic()
 
     try:
         handler = get_handler(slug)
@@ -72,6 +75,7 @@ def process_job(slug: str, task_id: str) -> Job:
             error=None,
             error_code=None,
         )
+        _settle(task_id, success=True, latency_ms=int((time.monotonic() - started) * 1000))
     except ProviderUnavailable as exc:
         logger.warning("Tool '%s' job '%s' has no provider: %s", slug, task_id, exc)
         updated = job_store.update(
@@ -80,6 +84,7 @@ def process_job(slug: str, task_id: str) -> Job:
             error=f"provider_unavailable: {exc}",
             error_code="provider_unavailable",
         )
+        _settle(task_id, success=False, reason="provider_unavailable")
     except Exception as exc:  # noqa: BLE001 - reported on the job
         logger.exception("Tool '%s' job '%s' failed", slug, task_id)
         updated = job_store.update(
@@ -88,7 +93,28 @@ def process_job(slug: str, task_id: str) -> Job:
             error=f"{type(exc).__name__}: {exc}",
             error_code="processing_error",
         )
+        _settle(task_id, success=False, reason="processing_error")
 
     if updated is None:
         raise KeyError(f"Job '{task_id}' disappeared during processing")
     return updated
+
+
+def _settle(
+    task_id: str, *, success: bool, latency_ms: int | None = None, reason: str = "failed"
+) -> None:
+    """Commit successful calls, refund failed ones. Failed calls are never charged.
+
+    Settlement failures are logged but never fail the job itself; the reserved
+    credits stay visible in the ledger for reconciliation.
+    """
+    billing = get_billing_client()
+    if not billing.enabled():
+        return
+    try:
+        if success:
+            billing.commit(task_id=task_id, status_code=200, latency_ms=latency_ms)
+        else:
+            billing.refund(task_id=task_id, reason=reason)
+    except BillingError as exc:
+        logger.error("Billing settlement failed for job '%s': %s", task_id, exc)

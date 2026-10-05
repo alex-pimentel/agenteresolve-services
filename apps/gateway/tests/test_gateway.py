@@ -1,11 +1,13 @@
 from collections.abc import Iterator
 
 import pytest
+from common.billing import reset_billing_client, set_billing_client
 from common.jobs import InMemoryJobStore, set_job_store
 from common.providers import factory
 from common.providers.llm import FakeLLM
 from common.storage import InMemoryObjectStore, set_object_store
 from fastapi.testclient import TestClient
+from gateway.auth import get_required_user
 from gateway.main import create_app
 
 
@@ -15,6 +17,7 @@ def client() -> Iterator[TestClient]:
     job_store = InMemoryJobStore()
     set_object_store(object_store)
     set_job_store(job_store)
+    reset_billing_client()
     factory.set_llm_provider(FakeLLM("Traduzido"))
 
     from worker.celery_app import celery_app
@@ -24,9 +27,15 @@ def client() -> Iterator[TestClient]:
     import worker.tasks  # noqa: F401  (registers worker.run_tool)
 
     app = create_app()
+    app.dependency_overrides[get_required_user] = lambda: {
+        "sub": "user_test_123",
+        "email": "test@example.com",
+    }
     with TestClient(app) as test_client:
         yield test_client
     factory.reset_providers()
+    app.dependency_overrides.clear()
+    set_billing_client(None)
 
 
 def test_health(client: TestClient) -> None:
@@ -122,10 +131,43 @@ def test_translate_rejects_oversized_input(client: TestClient) -> None:
     assert response.status_code == 413
 
 
-def test_anonymous_request_allowed_when_auth_unconfigured(client: TestClient) -> None:
-    response = client.post(
-        "/api/translate/",
-        json={"text": "Hello", "target": "pt"},
-        headers={"Authorization": "Bearer not-a-real-token"},
-    )
-    assert response.status_code == 202
+def test_job_creation_requires_login(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from common.config import get_settings
+    from gateway.auth import get_required_user as required
+
+    monkeypatch.setenv("AUTH_REQUIRED", "true")
+    get_settings.cache_clear()
+    client.app.dependency_overrides.clear()
+    try:
+        response = client.post(
+            "/api/translate/",
+            json={"text": "Hello", "target": "pt"},
+        )
+        assert response.status_code == 401
+    finally:
+        get_settings.cache_clear()
+        client.app.dependency_overrides[required] = lambda: {
+            "sub": "user_test_123",
+            "email": "test@example.com",
+        }
+
+
+def test_job_polling_requires_login(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from common.config import get_settings
+    from gateway.auth import get_required_user as required
+
+    created = client.post("/api/translate/", json={"text": "Hello", "target": "pt"})
+    assert created.status_code == 202
+    task_id = created.json()["task_id"]
+
+    monkeypatch.setenv("AUTH_REQUIRED", "true")
+    get_settings.cache_clear()
+    client.app.dependency_overrides.clear()
+    try:
+        assert client.get(f"/api/translate/{task_id}").status_code == 401
+    finally:
+        get_settings.cache_clear()
+        client.app.dependency_overrides[required] = lambda: {
+            "sub": "user_test_123",
+            "email": "test@example.com",
+        }

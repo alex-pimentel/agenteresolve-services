@@ -7,6 +7,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  ClerkTokenBridge,
   ServiceShell,
 } from '@agenteresolve/ui';
 import { Sparkles } from 'lucide-react';
@@ -19,9 +20,12 @@ import { formatBytes, getTool, type ToolConfig } from '../data/tools';
 import {
   createFileJob,
   createTextJob,
+  isInsufficientCredits,
   isProviderUnavailable,
+  isUnauthorized,
   isUnimplemented,
   pollJob,
+  setAuthTokenGetter,
   type Job,
 } from '../lib/api';
 import { CLERK_PUBLISHABLE_KEY } from '../lib/env';
@@ -89,6 +93,14 @@ function GatewayToolPage({ tool }: { tool: ToolConfig }) {
         setBetaNotice(
           'Esta ferramenta está em beta e o endpoint ainda não está disponível no gateway.',
         );
+      } else if (isUnauthorized(err)) {
+        setError(
+          'Entre para usar esta ferramenta: o login é gratuito e novas contas ganham 50 créditos.',
+        );
+      } else if (isInsufficientCredits(err)) {
+        setError(
+          'Créditos insuficientes para esta operação. Acompanhe seu saldo e histórico no portal.',
+        );
       } else if (isProviderUnavailable(err)) {
         setError(
           'Serviço temporariamente indisponível: o provedor de IA não está configurado no servidor. Tente novamente mais tarde.',
@@ -108,6 +120,7 @@ function GatewayToolPage({ tool }: { tool: ToolConfig }) {
       title={tool.name}
       description={tool.description}
     >
+      <ClerkTokenBridge onGetToken={setAuthTokenGetter} />
       {tool.note ? (
         <StateMessage tone="info" title="Aviso" className="mb-6">
           {tool.note}

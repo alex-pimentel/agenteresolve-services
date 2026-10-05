@@ -40,6 +40,53 @@ export function isProviderUnavailable(error: unknown): boolean {
   return error instanceof ApiError && error.status === 503;
 }
 
+/** `true` when the gateway rejected the call for lack of a valid login (HTTP 401). */
+export function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
+}
+
+/** `true` when the account has no credits left for this call (HTTP 402). */
+export function isInsufficientCredits(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 402;
+}
+
+/**
+ * Resolves the current Clerk session token (`null` when signed out).
+ * Wired by `<ClerkTokenBridge onGetToken={setAuthTokenGetter} />` from
+ * `@agenteresolve/ui`; without it calls go out unauthenticated and the
+ * gateway answers 401.
+ */
+export type AuthTokenGetter = () => Promise<string | null>;
+
+let authTokenGetter: AuthTokenGetter | null = null;
+
+export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
+  authTokenGetter = getter;
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!authTokenGetter) {
+    return {};
+  }
+  try {
+    const token = await authTokenGetter();
+    if (token && token.trim()) {
+      return { Authorization: `Bearer ${token.trim()}` };
+    }
+  } catch {
+    // Token lookup failed (signed out mid-flight); send unauthenticated.
+  }
+  return {};
+}
+
+function idempotencyKey(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+
 function apiUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
@@ -51,6 +98,12 @@ async function readErrorDetail(response: Response): Promise<string> {
       const detail = (data as { detail: unknown }).detail;
       if (typeof detail === 'string' && detail.trim()) {
         return detail;
+      }
+      if (detail && typeof detail === 'object' && 'message' in detail) {
+        const message = (detail as { message: unknown }).message;
+        if (typeof message === 'string' && message.trim()) {
+          return message;
+        }
       }
     }
   } catch {
@@ -83,7 +136,14 @@ export async function createTextJob(
 ): Promise<CreateJobResponse> {
   const response = await fetch(apiUrl(`/api/${slug}/`), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    // A fresh key per submit keeps accidental double-submits from
+    // double-charging (the gateway dedupes reservations per key). Retried
+    // *polls* reuse the returned task_id and never create a second reservation.
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Idempotency-Key': idempotencyKey(),
+      ...(await authHeaders()),
+    },
     body: JSON.stringify({ text, ...params }),
     signal,
   });
@@ -104,6 +164,7 @@ export async function createFileJob(
   }
   const response = await fetch(apiUrl(`/api/${slug}/`), {
     method: 'POST',
+    headers: { ...(await authHeaders()), 'X-Idempotency-Key': idempotencyKey() },
     body: form,
     signal,
   });
@@ -112,7 +173,10 @@ export async function createFileJob(
 
 /** Fetch a job (`GET /api/{slug}/{task_id}`). */
 export async function getJob(slug: string, taskId: string, signal?: AbortSignal): Promise<Job> {
-  const response = await fetch(apiUrl(`/api/${slug}/${taskId}`), { signal });
+  const response = await fetch(apiUrl(`/api/${slug}/${taskId}`), {
+    headers: await authHeaders(),
+    signal,
+  });
   if (!response.ok) {
     throw new ApiError(await readErrorDetail(response), response.status);
   }

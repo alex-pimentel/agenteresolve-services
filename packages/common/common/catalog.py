@@ -1,7 +1,7 @@
-"""Canonical tool catalogue: the single source of truth for the 16 slugs.
+"""Canonical tool catalogue: the single source of truth for the 18 slugs.
 
 The gateway uses this registry to route requests and expose tool metadata (queue, input
-kind, result kind, size limits) and to reject the one client-side tool. The worker uses the
+kind, result kind, size limits) and to reject client-side tools. The worker uses the
 queue field for routing. Every gateway tool is implemented; unavailable local models are
 reported at runtime as ``503 provider_unavailable`` rather than at registration time.
 """
@@ -34,7 +34,10 @@ class ToolSpec:
 
 
 _TOOLS: tuple[ToolSpec, ...] = (
-    # Client-side (browser, Cloudflare Pages) --------------------------------
+    # Client-side (browser / Electron, Cloudflare Pages) ----------------------
+    # These tools run fully on the device: no server compute, no credits.
+    # They are registered so the gateway stays the single tool registry and
+    # answers with a clear 400 instead of 404.
     ToolSpec(
         "louder",
         "Louder",
@@ -45,6 +48,28 @@ _TOOLS: tuple[ToolSpec, ...] = (
         result_kind="audio",
         implemented=False,
         notes="client-side only; no gateway endpoint",
+    ),
+    ToolSpec(
+        "qrcode",
+        "QRCode",
+        "client",
+        None,
+        100 * _KB,
+        input_kind="text",
+        result_kind="image",
+        implemented=False,
+        notes="client-side only; no gateway endpoint",
+    ),
+    ToolSpec(
+        "imposition",
+        "Imposition",
+        "client",
+        None,
+        100 * _MB,
+        input_kind="file",
+        result_kind="download",
+        implemented=False,
+        notes="local-only (Web + Electron); no gateway endpoint",
     ),
     # Text / LLM --------------------------------------------------------------
     ToolSpec("docuextract", "DocuExtract", "text", "text", 20 * _MB, input_kind="file"),
