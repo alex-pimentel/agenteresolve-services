@@ -7,6 +7,7 @@ to another VPS by changing env only.
 
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,7 +47,10 @@ class Settings(BaseSettings):
     # so failed calls are never charged.
     billing_enabled: bool = False
     billing_base_url: str | None = None
-    billing_service_token: str | None = None
+    billing_service_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("billing_service_token", "credits_service_token"),
+    )
     billing_timeout: float = 10.0
 
     # Gateway session tokens (centralized login) ---------------------------

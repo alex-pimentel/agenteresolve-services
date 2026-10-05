@@ -208,3 +208,114 @@ def test_billing_client_network_error() -> None:
     client = _mock_billing_client(httpx.MockTransport(handler))
     with pytest.raises(BillingUnavailable):
         client.reserve(clerk_id="u1", email=None, tool="translate", task_id="t1")
+
+
+def test_billing_client_reserve_500() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "boom"})
+
+    client = _mock_billing_client(httpx.MockTransport(handler))
+    with pytest.raises(BillingUnavailable):
+        client.reserve(clerk_id="u1", email=None, tool="translate", task_id="t1")
+
+
+def test_billing_client_reserve_bad_json() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"not json")
+
+    client = _mock_billing_client(httpx.MockTransport(handler))
+    with pytest.raises(BillingUnavailable):
+        client.reserve(clerk_id="u1", email=None, tool="translate", task_id="t1")
+
+
+def test_billing_client_commit_paths() -> None:
+    ok = _mock_billing_client(httpx.MockTransport(lambda r: httpx.Response(200, json={"cost": 2})))
+    assert ok.commit(task_id="t1") == 2
+
+    gone = _mock_billing_client(httpx.MockTransport(lambda r: httpx.Response(404)))
+    assert gone.commit(task_id="t1") == 0
+
+    bad = _mock_billing_client(httpx.MockTransport(lambda r: httpx.Response(500)))
+    with pytest.raises(BillingUnavailable):
+        bad.commit(task_id="t1")
+
+    invalid = _mock_billing_client(
+        httpx.MockTransport(lambda r: httpx.Response(200, content=b"nope"))
+    )
+    with pytest.raises(BillingUnavailable):
+        invalid.commit(task_id="t1")
+
+
+def test_billing_client_refund_paths() -> None:
+    for status in (200, 201, 404):
+        client = _mock_billing_client(httpx.MockTransport(lambda r, s=status: httpx.Response(s)))
+        assert client.refund(task_id="t1") == 0
+
+    failing = _mock_billing_client(httpx.MockTransport(lambda r: httpx.Response(500)))
+    with pytest.raises(BillingUnavailable):
+        failing.refund(task_id="t1")
+
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down")
+
+    offline = _mock_billing_client(httpx.MockTransport(unreachable))
+    with pytest.raises(BillingUnavailable):
+        offline.refund(task_id="t1")
+
+
+def test_billing_client_balance_paths() -> None:
+    ok = _mock_billing_client(
+        httpx.MockTransport(lambda r: httpx.Response(200, json={"balance": 41}))
+    )
+    assert ok.balance(clerk_id="u1") == 41
+
+    unknown = _mock_billing_client(httpx.MockTransport(lambda r: httpx.Response(404)))
+    assert unknown.balance(clerk_id="u1") == 0
+
+    failing = _mock_billing_client(httpx.MockTransport(lambda r: httpx.Response(500)))
+    with pytest.raises(BillingUnavailable):
+        failing.balance(clerk_id="u1")
+
+    invalid = _mock_billing_client(
+        httpx.MockTransport(lambda r: httpx.Response(200, content=b"nope"))
+    )
+    with pytest.raises(BillingUnavailable):
+        invalid.balance(clerk_id="u1")
+
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down")
+
+    offline = _mock_billing_client(httpx.MockTransport(unreachable))
+    with pytest.raises(BillingUnavailable):
+        offline.balance(clerk_id="u1")
+
+
+def test_build_billing_client_respects_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from common import billing as billing_module
+
+    monkeypatch.setenv("BILLING_ENABLED", "false")
+    billing_module.get_settings.cache_clear()
+    try:
+        assert isinstance(billing_module.build_billing_client(), DisabledBillingClient)
+    finally:
+        billing_module.get_settings.cache_clear()
+
+    monkeypatch.setenv("BILLING_ENABLED", "true")
+    monkeypatch.setenv("BILLING_BASE_URL", "https://billing.test")
+    monkeypatch.setenv("BILLING_SERVICE_TOKEN", "secret")
+    billing_module.get_settings.cache_clear()
+    try:
+        assert isinstance(billing_module.build_billing_client(), BillingClient)
+    finally:
+        billing_module.get_settings.cache_clear()
+
+
+def test_billing_client_globals_roundtrip() -> None:
+    from common import billing as billing_module
+
+    reset_billing_client()
+    assert isinstance(billing_module.get_billing_client(), DisabledBillingClient)
+    fake = FakeBillingClient()
+    set_billing_client(fake)
+    assert billing_module.get_billing_client() is fake
+    reset_billing_client()
