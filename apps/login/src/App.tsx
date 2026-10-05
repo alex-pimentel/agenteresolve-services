@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { Loader2 } from 'lucide-react';
-import { AuthProvider, Button, Card, CardContent, ServiceShell } from '@agenteresolve/ui';
+import { Button, Card, CardContent, ServiceShell } from '@agenteresolve/ui';
 import { SignIn } from '@clerk/clerk-react';
 
 import { CLERK_PUBLISHABLE_KEY } from './lib/env';
@@ -142,15 +142,15 @@ export function App() {
     );
   }
 
+  // NOTE: ServiceShell already wraps its children in AuthProvider — do NOT
+  // wrap it again here (nested ClerkProviders crash with "multiple providers").
   return (
-    <AuthProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <ServiceShell
-        publishableKey={CLERK_PUBLISHABLE_KEY}
-        title="Entrar"
-        description="Login central da Agenteresolve"
-      >
-        <LoginBody />
-      </ServiceShell>
-    </AuthProvider>
+    <ServiceShell
+      publishableKey={CLERK_PUBLISHABLE_KEY}
+      title="Entrar"
+      description="Login central da Agenteresolve"
+    >
+      <LoginBody />
+    </ServiceShell>
   );
 }
