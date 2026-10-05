@@ -1,0 +1,58 @@
+# Coolify: workers Celery da plataforma (text/vision/audio) para o servidor Oracle.
+# O gateway permanece no servidor principal; aqui rodam só os workers, apontando para
+# Redis/Postgres do principal (via Tailscale) e para a inferência local no Oracle.
+#
+#   docker compose -f docker-compose.workers.coolify.yml up --build
+#
+name: agenteresolve-workers
+
+x-worker: &worker
+  build:
+    context: .
+    dockerfile: Dockerfile.worker
+  env_file:
+    - path: .env
+      required: false
+  restart: unless-stopped
+  volumes:
+    - model-cache:/home/app/.cache
+
+services:
+  worker-text:
+    <<: *worker
+    command:
+      - celery
+      - -A
+      - worker.celery_app:celery_app
+      - worker
+      - -Q
+      - text
+      - --concurrency=1
+      - --loglevel=INFO
+
+  worker-vision:
+    <<: *worker
+    command:
+      - celery
+      - -A
+      - worker.celery_app:celery_app
+      - worker
+      - -Q
+      - vision
+      - --concurrency=1
+      - --loglevel=INFO
+
+  worker-audio:
+    <<: *worker
+    command:
+      - celery
+      - -A
+      - worker.celery_app:celery_app
+      - worker
+      - -Q
+      - audio
+      - --concurrency=1
+      - --loglevel=INFO
+
+volumes:
+  model-cache:
