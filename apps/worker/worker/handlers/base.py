@@ -24,6 +24,7 @@ class HandlerContext:
     input_key: str
     params: dict[str, Any] = field(default_factory=dict)
     llm: LLMProvider | None = None
+    translate_llm: LLMProvider | None = None
     embeddings: Any | None = None
     ocr: Any | None = None
     vision: Any | None = None

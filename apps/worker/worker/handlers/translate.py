@@ -49,7 +49,8 @@ class UnsupportedLanguage(ValueError):
 
 
 def handle_translate(ctx: HandlerContext) -> HandlerResult:
-    if ctx.llm is None:
+    llm = ctx.translate_llm or ctx.llm
+    if llm is None:
         raise ProviderUnavailable("translate requires an LLM provider")
 
     raw = ctx.object_store.get_bytes(ctx.input_key)
@@ -61,7 +62,7 @@ def handle_translate(ctx: HandlerContext) -> HandlerResult:
 
     tone = str(ctx.params.get("tone") or "neutral")
     prompt = f"Target language: {target}\nTone: {tone}\n\nText to translate:\n{text}"
-    translated = ctx.llm.complete(prompt, system=_SYSTEM_PROMPT)
+    translated = llm.complete(prompt, system=_SYSTEM_PROMPT)
 
     key = f"results/translate/{ctx.task_id}/result.txt"
     return HandlerResult(

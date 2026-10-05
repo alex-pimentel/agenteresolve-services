@@ -31,6 +31,9 @@ def _load_payload(object_store: ObjectStore, slug: str, task_id: str) -> dict[st
 
 
 def _build_context(job: Job, payload: dict[str, Any], object_store: ObjectStore) -> HandlerContext:
+    from common.config import get_settings
+
+    translate_model = get_settings().llm_model_translate
     return HandlerContext(
         task_id=job.task_id,
         slug=job.tool,
@@ -38,6 +41,9 @@ def _build_context(job: Job, payload: dict[str, Any], object_store: ObjectStore)
         input_key=payload["input_key"],
         params=payload.get("params", {}),
         llm=factory.get_llm_provider(),
+        translate_llm=(
+            factory.get_llm_provider_for_model(translate_model) if translate_model else None
+        ),
         embeddings=factory.get_embeddings_provider(),
         ocr=factory.get_ocr_provider(),
         vision=factory.get_vision_provider(),

@@ -63,6 +63,24 @@ def get_llm_provider() -> LLMProvider:
     return LocalLLM(settings.llm_model)
 
 
+def get_llm_provider_for_model(model: str | None) -> LLMProvider:
+    """Como :func:`get_llm_provider`, mas com um modelo específico (ex.: tradução)."""
+    if not model:
+        return get_llm_provider()
+    settings = get_settings()
+    base_url = settings.llm_base_url
+    if not base_url and settings.llm_api_key:
+        base_url = OPENROUTER_BASE_URL
+    if base_url:
+        return OpenAICompatibleLLM(
+            base_url=base_url,
+            api_key=settings.llm_api_key or "",
+            model=model,
+            timeout=settings.llm_timeout,
+        )
+    return LocalLLM(model)
+
+
 def get_embeddings_provider() -> EmbeddingsProvider:
     if "embeddings" in _overrides:
         return _overrides["embeddings"]

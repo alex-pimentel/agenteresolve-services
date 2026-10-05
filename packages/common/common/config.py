@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_api_key: str | None = None
     llm_model: str = "openai/gpt-4o-mini"
+    # Modelo dedicado à ferramenta de tradução (ex.: translategemma:4b no Ollama).
+    llm_model_translate: str | None = None
     llm_timeout: float = 60.0
 
     # Embeddings (OpenAI-compatible) ------------------------------------------
