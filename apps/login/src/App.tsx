@@ -68,15 +68,40 @@ function SessionExchange({ redirect }: { redirect: string }) {
   );
 }
 
-function LoginBody() {
+export function LoginBody() {
   const [redirect] = React.useState(readRedirect);
   const { isSignedIn, isLoaded } = useAuth();
+  const [loadTimedOut, setLoadTimedOut] = React.useState(false);
+
+  // Clerk loads its JS from the Clerk Frontend API. If that host is
+  // unreachable (DNS, offline), `isLoaded` never flips and the page would
+  // spin forever — surface an error with retry instead.
+  React.useEffect(() => {
+    if (isLoaded) {
+      return;
+    }
+    const timer = window.setTimeout(() => setLoadTimedOut(true), 15_000);
+    return () => window.clearTimeout(timer);
+  }, [isLoaded]);
 
   if (!isLoaded) {
+    if (!loadTimedOut) {
+      return (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="animate-spin" /> Carregando…
+        </p>
+      );
+    }
     return (
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="animate-spin" /> Carregando…
-      </p>
+      <div className="flex max-w-md flex-col items-center gap-4">
+        <StateMessage tone="error" title="Não foi possível carregar o login">
+          O serviço de autenticação não respondeu. Verifique sua conexão com a internet e
+          tente novamente.
+        </StateMessage>
+        <Button type="button" onClick={() => window.location.reload()}>
+          Tentar novamente
+        </Button>
+      </div>
     );
   }
 
