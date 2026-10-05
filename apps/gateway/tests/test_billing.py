@@ -9,6 +9,7 @@ from common.billing import (
     BillingUnavailable,
     DisabledBillingClient,
     InsufficientCredits,
+    Reservation,
     reset_billing_client,
     set_billing_client,
 )
@@ -16,6 +17,7 @@ from common.jobs import InMemoryJobStore, set_job_store
 from common.providers import factory
 from common.providers.llm import FakeLLM
 from common.storage import InMemoryObjectStore, set_object_store
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gateway.auth import get_required_user
 from gateway.main import create_app
@@ -33,9 +35,7 @@ class FakeBillingClient:
     def enabled(self) -> bool:
         return True
 
-    def reserve(self, **kwargs: object) -> object:
-        from common.billing import Reservation
-
+    def reserve(self, **kwargs: object) -> Reservation:
         task_id = str(kwargs.get("task_id", ""))
         self.reserved.append(task_id)
         return Reservation(task_id=task_id, cost=self.cost, balance=48)
@@ -44,8 +44,12 @@ class FakeBillingClient:
         self.committed.append(str(kwargs.get("task_id", "")))
         return self.cost
 
-    def refund(self, **kwargs: object) -> None:
+    def refund(self, **kwargs: object) -> int:
         self.refunded.append(str(kwargs.get("task_id", "")))
+        return self.cost
+
+    def balance(self, **kwargs: object) -> int:
+        return 48
 
 
 @pytest.fixture
@@ -56,7 +60,7 @@ def billing() -> FakeBillingClient:
 
 
 @pytest.fixture
-def client(billing: FakeBillingClient) -> Iterator[TestClient]:
+def app() -> Iterator[FastAPI]:
     set_object_store(InMemoryObjectStore())
     set_job_store(InMemoryJobStore())
     factory.set_llm_provider(FakeLLM("Traduzido"))
@@ -67,16 +71,21 @@ def client(billing: FakeBillingClient) -> Iterator[TestClient]:
     celery_app.conf.task_eager_propagates = False
     import worker.tasks  # noqa: F401  (registers worker.run_tool)
 
-    app = create_app()
-    app.dependency_overrides[get_required_user] = lambda: {
+    application = create_app()
+    application.dependency_overrides[get_required_user] = lambda: {
         "sub": "user_test_123",
         "email": "test@example.com",
     }
+    yield application
+    factory.reset_providers()
+    application.dependency_overrides.clear()
+    reset_billing_client()
+
+
+@pytest.fixture
+def client(app: FastAPI, billing: FakeBillingClient) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
-    factory.reset_providers()
-    app.dependency_overrides.clear()
-    reset_billing_client()
 
 
 def test_create_reserves_credits_and_commits_on_success(
@@ -125,15 +134,15 @@ def test_billing_outage_fails_closed(client: TestClient, monkeypatch: pytest.Mon
     assert response.status_code == 503
 
 
-def test_users_cannot_poll_each_others_jobs(client: TestClient) -> None:
+def test_users_cannot_poll_each_others_jobs(app: FastAPI, client: TestClient) -> None:
     created = client.post("/api/translate/", json={"text": "Hello", "target": "pt"})
     task_id = created.json()["task_id"]
 
-    client.app.dependency_overrides[get_required_user] = lambda: {"sub": "intruder"}
+    app.dependency_overrides[get_required_user] = lambda: {"sub": "intruder"}
     try:
         assert client.get(f"/api/translate/{task_id}").status_code == 404
     finally:
-        client.app.dependency_overrides[get_required_user] = lambda: {
+        app.dependency_overrides[get_required_user] = lambda: {
             "sub": "user_test_123",
             "email": "test@example.com",
         }
@@ -162,7 +171,7 @@ def test_disabled_billing_is_noop() -> None:
     client = DisabledBillingClient()
     assert client.enabled() is False
     assert client.commit(task_id="x") == 0
-    assert client.refund(task_id="x") is None
+    assert client.refund(task_id="x") == 0
 
 
 def _mock_billing_client(handler: httpx.MockTransport) -> BillingClient:

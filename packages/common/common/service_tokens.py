@@ -35,7 +35,7 @@ def _secret() -> str:
     return secret
 
 
-def _denylist() -> object | None:
+def _denylist() -> Any | None:
     """Return a Redis client for the logout denylist, or None when unconfigured."""
     url = get_settings().redis_url
     if not url:

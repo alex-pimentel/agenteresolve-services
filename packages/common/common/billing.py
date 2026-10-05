@@ -9,7 +9,7 @@ or backends; the gateway is the single choke-point.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from common.config import get_settings
 
@@ -37,6 +37,26 @@ class Reservation:
     task_id: str
     cost: int
     balance: int
+
+
+class BillingClientProtocol(Protocol):
+    """Structural type for billing backends (real, disabled, test fakes)."""
+
+    def enabled(self) -> bool: ...
+    def reserve(
+        self,
+        *,
+        clerk_id: str,
+        email: str | None,
+        tool: str,
+        task_id: str,
+        idempotency_key: str | None = None,
+    ) -> Reservation: ...
+    def commit(
+        self, *, task_id: str, status_code: int = 200, latency_ms: int | None = None
+    ) -> int: ...
+    def refund(self, *, task_id: str, reason: str = "failed") -> int: ...
+    def balance(self, *, clerk_id: str) -> int: ...
 
 
 class BillingClient:
@@ -126,8 +146,8 @@ class BillingClient:
         except ValueError as exc:
             raise BillingUnavailable("Billing commit returned invalid JSON") from exc
 
-    def refund(self, *, task_id: str, reason: str = "failed") -> None:
-        """Refund a failed call. Never raises for unknown tasks."""
+    def refund(self, *, task_id: str, reason: str = "failed") -> int:
+        """Refund a failed call. Returns the refunded amount. Never raises for unknown tasks."""
         import httpx
 
         try:
@@ -137,7 +157,7 @@ class BillingClient:
         except httpx.HTTPError as exc:
             raise BillingUnavailable(f"Billing refund failed: {exc}") from exc
         if response.status_code in (200, 201, 404):
-            return
+            return 0
         raise BillingUnavailable(f"Billing refund failed: HTTP {response.status_code}")
 
     def balance(self, *, clerk_id: str) -> int:
@@ -172,14 +192,14 @@ class DisabledBillingClient:
     def commit(self, **kwargs: object) -> int:
         return 0
 
-    def refund(self, **kwargs: object) -> None:
-        return None
+    def refund(self, **kwargs: object) -> int:
+        return 0
 
     def balance(self, **kwargs: object) -> int:
         return 0
 
 
-def build_billing_client() -> BillingClient | DisabledBillingClient:
+def build_billing_client() -> BillingClientProtocol:
     settings = get_settings()
     if settings.billing_enabled and settings.billing_base_url and settings.billing_service_token:
         return BillingClient(
@@ -190,17 +210,17 @@ def build_billing_client() -> BillingClient | DisabledBillingClient:
     return DisabledBillingClient()
 
 
-_billing_client: BillingClient | DisabledBillingClient | None = None
+_billing_client: BillingClientProtocol | None = None
 
 
-def get_billing_client() -> BillingClient | DisabledBillingClient:
+def get_billing_client() -> BillingClientProtocol:
     global _billing_client
     if _billing_client is None:
         _billing_client = build_billing_client()
     return _billing_client
 
 
-def set_billing_client(client: BillingClient | DisabledBillingClient | None) -> None:
+def set_billing_client(client: BillingClientProtocol | None) -> None:
     global _billing_client
     _billing_client = client
 

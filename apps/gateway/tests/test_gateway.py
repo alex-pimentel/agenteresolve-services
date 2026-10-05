@@ -6,13 +6,14 @@ from common.jobs import InMemoryJobStore, set_job_store
 from common.providers import factory
 from common.providers.llm import FakeLLM
 from common.storage import InMemoryObjectStore, set_object_store
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gateway.auth import get_required_user
 from gateway.main import create_app
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
+def app() -> Iterator[FastAPI]:
     object_store = InMemoryObjectStore()
     job_store = InMemoryJobStore()
     set_object_store(object_store)
@@ -26,16 +27,21 @@ def client() -> Iterator[TestClient]:
     celery_app.conf.task_eager_propagates = False
     import worker.tasks  # noqa: F401  (registers worker.run_tool)
 
-    app = create_app()
-    app.dependency_overrides[get_required_user] = lambda: {
+    application = create_app()
+    application.dependency_overrides[get_required_user] = lambda: {
         "sub": "user_test_123",
         "email": "test@example.com",
     }
+    yield application
+    factory.reset_providers()
+    application.dependency_overrides.clear()
+    set_billing_client(None)
+
+
+@pytest.fixture
+def client(app: FastAPI) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
-    factory.reset_providers()
-    app.dependency_overrides.clear()
-    set_billing_client(None)
 
 
 def test_health(client: TestClient) -> None:
@@ -131,13 +137,15 @@ def test_translate_rejects_oversized_input(client: TestClient) -> None:
     assert response.status_code == 413
 
 
-def test_job_creation_requires_login(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_job_creation_requires_login(
+    app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from common.config import get_settings
     from gateway.auth import get_required_user as required
 
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     get_settings.cache_clear()
-    client.app.dependency_overrides.clear()
+    app.dependency_overrides.clear()
     try:
         response = client.post(
             "/api/translate/",
@@ -146,13 +154,15 @@ def test_job_creation_requires_login(client: TestClient, monkeypatch: pytest.Mon
         assert response.status_code == 401
     finally:
         get_settings.cache_clear()
-        client.app.dependency_overrides[required] = lambda: {
+        app.dependency_overrides[required] = lambda: {
             "sub": "user_test_123",
             "email": "test@example.com",
         }
 
 
-def test_job_polling_requires_login(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_job_polling_requires_login(
+    app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from common.config import get_settings
     from gateway.auth import get_required_user as required
 
@@ -162,12 +172,12 @@ def test_job_polling_requires_login(client: TestClient, monkeypatch: pytest.Monk
 
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     get_settings.cache_clear()
-    client.app.dependency_overrides.clear()
+    app.dependency_overrides.clear()
     try:
         assert client.get(f"/api/translate/{task_id}").status_code == 401
     finally:
         get_settings.cache_clear()
-        client.app.dependency_overrides[required] = lambda: {
+        app.dependency_overrides[required] = lambda: {
             "sub": "user_test_123",
             "email": "test@example.com",
         }

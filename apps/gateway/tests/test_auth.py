@@ -14,13 +14,14 @@ from common.service_tokens import (
     verify_token,
 )
 from common.storage import InMemoryObjectStore, set_object_store
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gateway.auth import get_required_user
 from gateway.main import create_app
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
+def app() -> Iterator[FastAPI]:
     set_object_store(InMemoryObjectStore())
     set_job_store(InMemoryJobStore())
     factory.set_llm_provider(FakeLLM("Traduzido"))
@@ -31,19 +32,24 @@ def client() -> Iterator[TestClient]:
     celery_app.conf.task_eager_propagates = False
     import worker.tasks  # noqa: F401  (registers worker.run_tool)
 
-    app = create_app()
-    app.dependency_overrides[get_required_user] = lambda: {
+    application = create_app()
+    application.dependency_overrides[get_required_user] = lambda: {
         "sub": "user_test_123",
         "email": "test@example.com",
     }
-    with TestClient(app) as test_client:
-        yield test_client
+    yield application
     factory.reset_providers()
-    app.dependency_overrides.clear()
+    application.dependency_overrides.clear()
 
 
 @pytest.fixture
-def session_secret(monkeypatch: pytest.MonkeyPatch) -> str:
+def client(app: FastAPI) -> Iterator[TestClient]:
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def session_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     from common.config import get_settings
 
     monkeypatch.setenv("GATEWAY_SESSION_SECRET", "test-secret-123")
@@ -85,7 +91,7 @@ def test_full_session_flow(client: TestClient, session_secret: str) -> None:
 
 
 def test_expired_session_token_rejected(
-    client: TestClient, session_secret: str, monkeypatch: pytest.MonkeyPatch
+    app: FastAPI, client: TestClient, session_secret: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import jwt
 
@@ -103,13 +109,13 @@ def test_expired_session_token_rejected(
     )
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     get_settings.cache_clear()
-    client.app.dependency_overrides.clear()
+    app.dependency_overrides.clear()
     try:
         response = client.get("/api/auth/me", headers={"Authorization": f"Bearer {stale}"})
         assert response.status_code == 401
     finally:
         get_settings.cache_clear()
-        client.app.dependency_overrides[get_required_user] = lambda: {
+        app.dependency_overrides[get_required_user] = lambda: {
             "sub": "user_test_123",
             "email": "test@example.com",
         }
@@ -130,7 +136,7 @@ def test_tampered_token_rejected(session_secret: str) -> None:
 
 
 def test_logout_revokes_with_denylist(
-    client: TestClient, session_secret: str, monkeypatch: pytest.MonkeyPatch
+    app: FastAPI, client: TestClient, session_secret: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import common.service_tokens as st
 
@@ -149,7 +155,7 @@ def test_logout_revokes_with_denylist(
     monkeypatch.setattr(st, "_denylist", lambda: fake)
     monkeypatch.setenv("AUTH_REQUIRED", "true")
     get_settings.cache_clear()
-    client.app.dependency_overrides.clear()
+    app.dependency_overrides.clear()
     try:
         token, _, _ = issue_token(clerk_id="u1")
         assert revoke_token(token) is True
@@ -169,7 +175,7 @@ def test_logout_revokes_with_denylist(
         )
     finally:
         get_settings.cache_clear()
-        client.app.dependency_overrides[get_required_user] = lambda: {
+        app.dependency_overrides[get_required_user] = lambda: {
             "sub": "user_test_123",
             "email": "test@example.com",
         }
