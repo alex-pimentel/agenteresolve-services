@@ -20,3 +20,7 @@ class Job(BaseModel):
     result_url: str | None = None
     error: str | None = None
     error_code: str | None = None
+    # Billing provenance (centralized credits; None for legacy jobs).
+    owner_sub: str | None = None
+    cost_units: int = Field(default=0, ge=0)
+    idempotency_key: str | None = None

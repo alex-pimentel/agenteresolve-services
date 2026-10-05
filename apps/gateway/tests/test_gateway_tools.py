@@ -19,6 +19,7 @@ from common.providers.llm import FakeLLM
 from common.sessions import SessionStore, set_session_store
 from common.storage import InMemoryObjectStore, set_object_store
 from fastapi.testclient import TestClient
+from gateway.auth import get_required_user
 from gateway.main import create_app
 
 
@@ -109,9 +110,14 @@ def client() -> Iterator[TestClient]:
     import worker.tasks  # noqa: F401  (registers worker.run_tool)
 
     app = create_app()
+    app.dependency_overrides[get_required_user] = lambda: {
+        "sub": "user_test_123",
+        "email": "test@example.com",
+    }
     with TestClient(app) as test_client:
         yield test_client
     factory.reset_providers()
+    app.dependency_overrides.clear()
 
 
 def _run(client: TestClient, slug: str, *, method: str = "json", **kwargs: object) -> dict:

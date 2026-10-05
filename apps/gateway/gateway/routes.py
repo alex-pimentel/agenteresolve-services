@@ -6,14 +6,19 @@ import logging
 import uuid
 from typing import Any
 
+from common.billing import (
+    BillingUnavailable,
+    InsufficientCredits,
+    get_billing_client,
+)
 from common.config import get_settings
 from common.job import JobStatus
 from common.jobs import get_job_store
 from common.sessions import get_session_store
 from common.storage import get_object_store
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
-from gateway.auth import get_optional_user
+from gateway.auth import get_required_user
 from gateway.jobs import create_tool_job
 from gateway.registry import resolve
 from gateway.schemas import AskRequest, VoiceChatSessionRequest
@@ -22,16 +27,127 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _principal(user: dict[str, Any]) -> tuple[str, str | None]:
+    sub = str(user.get("sub", ""))
+    email = user.get("email")
+    return sub, email if isinstance(email, str) else None
+
+
+def _reserve_or_raise(
+    *,
+    slug: str,
+    task_id: str,
+    user: dict[str, Any],
+    idempotency_key: str | None,
+) -> int:
+    """Reserve credits for a new job. Returns the reserved cost (0 when disabled)."""
+    billing = get_billing_client()
+    if not billing.enabled():
+        return 0
+    sub, email = _principal(user)
+    try:
+        reservation = billing.reserve(
+            clerk_id=sub,
+            email=email,
+            tool=slug,
+            task_id=task_id,
+            idempotency_key=idempotency_key,
+        )
+    except InsufficientCredits as exc:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "insufficient_credits",
+                "message": "Créditos insuficientes para usar esta ferramenta.",
+                "balance": exc.balance,
+                "required": exc.required,
+                "tool": slug,
+            },
+        ) from exc
+    except BillingUnavailable as exc:
+        logger.warning("Billing unavailable for tool '%s': %s", slug, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "billing_unavailable",
+                "message": "Serviço de cobrança indisponível. Tente novamente em instantes.",
+                "tool": slug,
+            },
+        ) from exc
+    return reservation.cost
+
+
 @router.get("/health", tags=["meta"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+def _balance_or_none(clerk_id: str) -> int | None:
+    billing = get_billing_client()
+    if not billing.enabled():
+        return None
+    try:
+        return billing.balance(clerk_id=clerk_id)
+    except BillingUnavailable:
+        logger.warning("Billing unavailable while reading balance", exc_info=True)
+        return None
+
+
+@router.post("/api/auth/session", tags=["auth"])
+def create_session_token(
+    user: dict[str, Any] = Depends(get_required_user),
+) -> dict[str, Any]:
+    """Exchange a Clerk JWT (or refresh a gateway token) for a gateway session token.
+
+    Used once by the central login app after Clerk sign-in. Tool frontends store
+    the returned token in the browser and use it as ``Bearer`` everywhere.
+    """
+    from common.service_tokens import ServiceTokenError, issue_token
+
+    sub, email = _principal(user)
+    try:
+        token, expires_at, _jti = issue_token(clerk_id=sub, email=email)
+    except ServiceTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    return {
+        "access_token": token,
+        "token_type": "Bearer",  # nosec B105 - OAuth2 token type label, not a password
+        "expires_at": expires_at,
+        "clerk_id": sub,
+        "balance": _balance_or_none(sub),
+    }
+
+
+@router.get("/api/auth/me", tags=["auth"])
+def auth_me(user: dict[str, Any] = Depends(get_required_user)) -> dict[str, Any]:
+    """Profile + balance for the current session (either token kind)."""
+    sub, email = _principal(user)
+    return {"clerk_id": sub, "email": email, "balance": _balance_or_none(sub)}
+
+
+@router.post("/api/auth/logout", tags=["auth"])
+def logout(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    """Revoke the current gateway session token (Clerk JWTs are unaffected)."""
+    from common.service_tokens import revoke_token
+
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Login required: sign in to use this tool.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    token = authorization.removeprefix("Bearer ").strip()
+    return {"status": "ok", "revoked": revoke_token(token)}
 
 
 @router.post("/api/{slug}/session", tags=["sessions"])
 def create_session(
     slug: str,
     request: Request,
-    _user: dict[str, Any] | None = Depends(get_optional_user),
+    user: dict[str, Any] = Depends(get_required_user),
 ) -> dict[str, Any]:
     resolve(slug)
     session_id = uuid.uuid4().hex
@@ -44,7 +160,7 @@ def create_session(
 def get_session(
     slug: str,
     session_id: str,
-    _user: dict[str, Any] | None = Depends(get_optional_user),
+    user: dict[str, Any] = Depends(get_required_user),
 ) -> dict[str, Any]:
     resolve(slug)
     session = get_session_store().get(session_id)
@@ -59,7 +175,7 @@ def get_session(
 @router.post("/api/voicechat/session", tags=["sessions"])
 def create_voicechat_session(
     body: VoiceChatSessionRequest | None = None,
-    _user: dict[str, Any] | None = Depends(get_optional_user),
+    user: dict[str, Any] = Depends(get_required_user),
 ) -> dict[str, Any]:
     session_id = uuid.uuid4().hex
     payload = body or VoiceChatSessionRequest()
@@ -71,7 +187,7 @@ def create_voicechat_session(
 
 @router.post("/api/askyourdocs/session", tags=["sessions"])
 def create_ask_session(
-    _user: dict[str, Any] | None = Depends(get_optional_user),
+    user: dict[str, Any] = Depends(get_required_user),
 ) -> dict[str, Any]:
     session_id = uuid.uuid4().hex
     get_session_store().create(session_id, "askyourdocs", records=[])
@@ -87,7 +203,8 @@ def ask_session(
     slug: str,
     session_id: str,
     body: AskRequest,
-    _user: dict[str, Any] | None = Depends(get_optional_user),
+    request: Request,
+    user: dict[str, Any] = Depends(get_required_user),
 ) -> dict[str, Any]:
     spec = resolve(slug)
     if slug not in ("askyourdocs", "datachat"):
@@ -105,8 +222,18 @@ def ask_session(
         )
     content = body.question.encode("utf-8")
     params = {"question": body.question, "session_id": session_id}
+    task_id = uuid.uuid4().hex
+    idempotency_key = request.headers.get("X-Idempotency-Key")
+    cost = _reserve_or_raise(slug=slug, task_id=task_id, user=user, idempotency_key=idempotency_key)
     job = create_tool_job(
-        slug=slug, params=params, content=content, content_type="text/plain; charset=utf-8"
+        slug=slug,
+        params=params,
+        content=content,
+        content_type="text/plain; charset=utf-8",
+        owner_sub=str(user.get("sub", "")),
+        cost_units=cost,
+        idempotency_key=idempotency_key,
+        task_id=task_id,
     )
     return {"task_id": job.task_id, "tool": slug, "status": job.status.value}
 
@@ -115,7 +242,7 @@ def ask_session(
 async def create_job(
     slug: str,
     request: Request,
-    _user: dict[str, Any] | None = Depends(get_optional_user),
+    user: dict[str, Any] = Depends(get_required_user),
 ) -> dict[str, str]:
     spec = resolve(slug)
     if not spec.implemented:
@@ -133,7 +260,23 @@ async def create_job(
         )
 
     params, content, content_type = await _parse_input(request, spec.max_bytes)
-    job = create_tool_job(slug=slug, params=params, content=content, content_type=content_type)
+    task_id = uuid.uuid4().hex
+    cost = _reserve_or_raise(
+        slug=slug,
+        task_id=task_id,
+        user=user,
+        idempotency_key=request.headers.get("X-Idempotency-Key"),
+    )
+    job = create_tool_job(
+        slug=slug,
+        params=params,
+        content=content,
+        content_type=content_type,
+        owner_sub=str(user.get("sub", "")),
+        cost_units=cost,
+        idempotency_key=request.headers.get("X-Idempotency-Key"),
+        task_id=task_id,
+    )
     return {"task_id": job.task_id, "tool": slug, "status": job.status.value}
 
 
@@ -141,12 +284,17 @@ async def create_job(
 def get_job(
     slug: str,
     task_id: str,
-    _user: dict[str, Any] | None = Depends(get_optional_user),
+    user: dict[str, Any] = Depends(get_required_user),
 ) -> dict[str, Any]:
     resolve(slug)
     job_store = get_job_store()
     job = job_store.get(task_id)
     if job is None or job.tool != slug:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Task '{task_id}' not found for tool '{slug}'",
+        )
+    if job.owner_sub is not None and job.owner_sub != str(user.get("sub", "")):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Task '{task_id}' not found for tool '{slug}'",

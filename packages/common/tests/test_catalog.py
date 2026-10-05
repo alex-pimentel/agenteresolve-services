@@ -3,6 +3,8 @@ from common.catalog import CATALOG, SLUGS, get_tool
 
 EXPECTED = {
     "louder",
+    "qrcode",
+    "imposition",
     "docuextract",
     "askyourdocs",
     "datachat",
@@ -21,15 +23,17 @@ EXPECTED = {
 }
 
 
-def test_catalog_has_sixteen_slugs() -> None:
+def test_catalog_has_eighteen_slugs() -> None:
     assert set(SLUGS) == EXPECTED
-    assert len(SLUGS) == 16
+    assert len(SLUGS) == 18
 
 
 def test_every_gateway_tool_is_implemented() -> None:
     implemented = {slug for slug, spec in CATALOG.items() if spec.implemented}
-    assert implemented == EXPECTED - {"louder"}
+    assert implemented == EXPECTED - {"louder", "qrcode", "imposition"}
     assert CATALOG["louder"].implemented is False
+    assert CATALOG["qrcode"].implemented is False
+    assert CATALOG["imposition"].implemented is False
 
 
 def test_tool_metadata_fields() -> None:

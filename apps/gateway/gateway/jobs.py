@@ -19,9 +19,13 @@ def create_tool_job(
     params: dict[str, Any],
     content: bytes,
     content_type: str,
+    owner_sub: str | None = None,
+    cost_units: int = 0,
+    idempotency_key: str | None = None,
+    task_id: str | None = None,
 ) -> Job:
     spec = get_tool(slug)
-    task_id = uuid.uuid4().hex
+    task_id = task_id or uuid.uuid4().hex
     input_key = f"uploads/{slug}/{task_id}/input"
     payload_key = f"uploads/{slug}/{task_id}/payload.json"
 
@@ -29,13 +33,26 @@ def create_tool_job(
     object_store.put_bytes(input_key, content, content_type)
     object_store.put_bytes(
         payload_key,
-        json.dumps({"input_key": input_key, "content_type": content_type, "params": params}).encode(
-            "utf-8"
-        ),
+        json.dumps(
+            {
+                "input_key": input_key,
+                "content_type": content_type,
+                "params": params,
+                "owner_sub": owner_sub,
+                "cost_units": cost_units,
+                "idempotency_key": idempotency_key,
+            }
+        ).encode("utf-8"),
         "application/json",
     )
 
-    job = Job(task_id=task_id, tool=slug)
+    job = Job(
+        task_id=task_id,
+        tool=slug,
+        owner_sub=owner_sub,
+        cost_units=cost_units,
+        idempotency_key=idempotency_key,
+    )
     get_job_store().create(job)
 
     enqueue_tool(slug, task_id, spec.queue)

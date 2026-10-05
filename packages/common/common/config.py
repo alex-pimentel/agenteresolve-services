@@ -7,6 +7,7 @@ to another VPS by changing env only.
 
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,10 +31,33 @@ class Settings(BaseSettings):
     r2_region: str = "auto"
     r2_presign_seconds: int = 3_600
 
-    # Clerk auth (optional; anonymous allowed when unset) ----------------------
+    # Clerk auth --------------------------------------------------------------
+    # When ``auth_required`` is true (production default) every /api/* route
+    # requires a valid Clerk session JWT. Set AUTH_REQUIRED=false for local
+    # development without Clerk.
+    auth_required: bool = True
     clerk_jwks_url: str | None = None
     clerk_issuer: str | None = None
     clerk_audience: str | None = None
+
+    # Centralized billing (Laravel is the source of truth) -------------------
+    # When ``billing_enabled`` is false the gateway skips reserve/commit/refund
+    # (dev/test behavior). In production it must be true: the gateway reserves
+    # credits on job creation and settles (commit on success, refund on error)
+    # so failed calls are never charged.
+    billing_enabled: bool = False
+    billing_base_url: str | None = None
+    billing_service_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("billing_service_token", "credits_service_token"),
+    )
+    billing_timeout: float = 10.0
+
+    # Gateway session tokens (centralized login) ---------------------------
+    # The login app exchanges Clerk JWTs for these long-lived HMAC tokens;
+    # tool frontends store them in the browser and never touch Clerk.
+    gateway_session_secret: str | None = None
+    gateway_session_ttl_seconds: int = 30 * 86_400  # 30d
 
     # LLM (OpenAI-compatible; default OpenRouter) ------------------------------
     llm_base_url: str | None = None
