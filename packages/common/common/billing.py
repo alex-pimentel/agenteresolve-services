@@ -106,9 +106,7 @@ class BillingClient:
             balance=int(body.get("balance", 0)),
         )
 
-    def commit(
-        self, *, task_id: str, status_code: int = 200, latency_ms: int | None = None
-    ) -> int:
+    def commit(self, *, task_id: str, status_code: int = 200, latency_ms: int | None = None) -> int:
         """Settle a successful call. Returns the charged cost. Idempotent."""
         import httpx
 
@@ -183,11 +181,7 @@ class DisabledBillingClient:
 
 def build_billing_client() -> BillingClient | DisabledBillingClient:
     settings = get_settings()
-    if (
-        settings.billing_enabled
-        and settings.billing_base_url
-        and settings.billing_service_token
-    ):
+    if settings.billing_enabled and settings.billing_base_url and settings.billing_service_token:
         return BillingClient(
             base_url=settings.billing_base_url,
             service_token=settings.billing_service_token,

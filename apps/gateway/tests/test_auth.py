@@ -90,8 +90,14 @@ def test_expired_session_token_rejected(
     import jwt
 
     stale = jwt.encode(
-        {"iss": "agenteresolve-gateway", "typ": "gateway-session", "sub": "u",
-         "jti": "x", "iat": 1, "exp": 2},
+        {
+            "iss": "agenteresolve-gateway",
+            "typ": "gateway-session",
+            "sub": "u",
+            "jti": "x",
+            "iat": 1,
+            "exp": 2,
+        },
         session_secret,
         algorithm="HS256",
     )
@@ -179,6 +185,5 @@ def test_logout_without_redis_is_best_effort(
     logged = client.post("/api/auth/logout", headers={"Authorization": f"Bearer {issued}"})
     assert logged.json() == {"status": "ok", "revoked": False}
     assert (
-        client.get("/api/auth/me", headers={"Authorization": f"Bearer {issued}"}).status_code
-        == 200
+        client.get("/api/auth/me", headers={"Authorization": f"Bearer {issued}"}).status_code == 200
     )
