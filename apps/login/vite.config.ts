@@ -12,5 +12,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Inline the shared UI package so vi.mock('@clerk/clerk-react') also
+    // applies inside it (otherwise its prebuilt dist is externalized and keeps
+    // the real ClerkProvider, which tries network access in tests).
+    server: { deps: { inline: ['@agenteresolve/ui'] } },
   },
 });
