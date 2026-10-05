@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     clerk_issuer: str | None = None
     clerk_audience: str | None = None
 
+    # CORS (browsers) --------------------------------------------------------
+    # Comma-separated origins allowed to call the gateway, or "*" for all.
+    # Auth is header-based (no cookies), so credentials stay disabled.
+    cors_origins: str = "*"
+
     # Centralized billing (Laravel is the source of truth) -------------------
     # When ``billing_enabled`` is false the gateway skips reserve/commit/refund
     # (dev/test behavior). In production it must be true: the gateway reserves

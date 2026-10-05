@@ -181,3 +181,19 @@ def test_job_polling_requires_login(
             "sub": "user_test_123",
             "email": "test@example.com",
         }
+
+
+def test_cors_preflight_allows_browser_calls(client: TestClient) -> None:
+    response = client.options(
+        "/api/translate/",
+        headers={
+            "Origin": "https://translate.agenteresolve.com.br",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type,x-idempotency-key",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] in (
+        "https://translate.agenteresolve.com.br",
+        "*",
+    )
