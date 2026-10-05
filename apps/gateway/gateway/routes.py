@@ -114,7 +114,7 @@ def create_session_token(
         ) from exc
     return {
         "access_token": token,
-        "token_type": "Bearer",
+        "token_type": "Bearer",  # nosec B105 - OAuth2 token type label, not a password
         "expires_at": expires_at,
         "clerk_id": sub,
         "balance": _balance_or_none(sub),

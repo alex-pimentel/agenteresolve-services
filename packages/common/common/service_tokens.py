@@ -95,7 +95,7 @@ def verify_token(token: str) -> dict[str, Any]:
                 raise ServiceTokenError("Session token was revoked")
         except ServiceTokenError:
             raise
-        except Exception:  # noqa: BLE001 - denylist lookup stays best-effort
+        except Exception:  # noqa: BLE001 - denylist lookup stays best-effort  # nosec B110
             pass
     return claims
 
