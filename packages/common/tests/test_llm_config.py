@@ -110,6 +110,16 @@ def test_invalid_payload_falls_back_to_env(monkeypatch: pytest.MonkeyPatch) -> N
     assert result.source == "env"
 
 
+def test_admin_without_key_falls_back_to_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    _settings(monkeypatch)
+    transport = _transport(
+        {"mode": "api", "base_url": "https://openrouter.ai/api/v1", "model": "m", "api_key": None}
+    )
+    result = llm_config.get_effective_llm(None, transport=transport)
+    assert result.source == "env"
+    assert result.api_key == "env-key"
+
+
 def test_missing_portal_config_falls_back_to_env(monkeypatch: pytest.MonkeyPatch) -> None:
     _settings(monkeypatch, BILLING_BASE_URL=None)
     transport = _transport({"mode": "api", "base_url": "b", "model": "m", "api_key": None})
