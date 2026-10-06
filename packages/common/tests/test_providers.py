@@ -15,6 +15,48 @@ def test_fake_llm_records_calls() -> None:
     assert llm.calls[0]["system"] == "s"
 
 
+class _FakeResponse:
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> dict:
+        return {"choices": [{"message": {"content": "Olá"}}]}
+
+
+def _capture_client(captured: dict, monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeClient:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def __enter__(self) -> "_FakeClient":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def post(self, url: str, json: object = None, headers: dict | None = None) -> _FakeResponse:
+            captured.update(headers or {})
+            return _FakeResponse()
+
+    monkeypatch.setattr("common.providers.llm.httpx.Client", _FakeClient)
+
+
+def test_empty_key_omits_authorization_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict = {}
+    _capture_client(captured, monkeypatch)
+    llm = OpenAICompatibleLLM("https://example.com/v1", "", "m")
+    assert llm.complete("hi") == "Olá"
+    assert "Authorization" not in captured
+
+
+def test_key_present_sends_authorization_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict = {}
+    _capture_client(captured, monkeypatch)
+    llm = OpenAICompatibleLLM("https://example.com/v1", "secret", "m")
+    assert llm.complete("hi") == "Olá"
+    assert captured["Authorization"] == "Bearer secret"
+
+
 def test_factory_uses_remote_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_BASE_URL", "https://example.com/v1")
     monkeypatch.setenv("LLM_API_KEY", "secret")

@@ -52,9 +52,10 @@ class OpenAICompatibleLLM:
             payload["max_tokens"] = max_tokens
 
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         with httpx.Client(timeout=self.timeout) as client:
             response = client.post(
                 f"{self.base_url}/chat/completions", json=payload, headers=headers
