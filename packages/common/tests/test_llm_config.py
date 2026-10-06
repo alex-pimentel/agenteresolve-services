@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 
 import httpx
 import pytest
 
 from common import llm_config
+
+
+class _RecordingTransport(httpx.MockTransport):
+    def __init__(
+        self, handler: Callable[[httpx.Request], httpx.Response], calls: list[httpx.Request]
+    ) -> None:
+        super().__init__(handler)
+        self.calls = calls
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +26,7 @@ def _reset():
     llm_config.clear_llm_cache()
 
 
-def _transport(payload: dict | None, *, status: int = 200) -> httpx.MockTransport:
+def _transport(payload: dict | None, *, status: int = 200) -> _RecordingTransport:
     calls: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -26,9 +35,7 @@ def _transport(payload: dict | None, *, status: int = 200) -> httpx.MockTranspor
             raise httpx.ConnectError("down")
         return httpx.Response(status, json=payload)
 
-    transport = httpx.MockTransport(handler)
-    transport.calls = calls  # type: ignore[attr-defined]
-    return transport
+    return _RecordingTransport(handler, calls)
 
 
 def _settings(monkeypatch: pytest.MonkeyPatch, **overrides: object) -> None:
