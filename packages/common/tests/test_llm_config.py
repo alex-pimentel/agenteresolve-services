@@ -80,7 +80,8 @@ def test_expired_ttl_refetches(monkeypatch: pytest.MonkeyPatch) -> None:
     _settings(monkeypatch)
     transport = _transport({"mode": "api", "base_url": "b", "model": "m", "api_key": None})
     llm_config.get_effective_llm(None, transport=transport)
-    llm_config._CACHE["__all__"] = (time.monotonic() - 61.0, llm_config.EffectiveLlm("b", None, "m", "admin"))
+    stale = llm_config.EffectiveLlm("b", None, "m", "admin")
+    llm_config._CACHE["__all__"] = (time.monotonic() - 61.0, stale)
     llm_config.get_effective_llm(None, transport=transport)
     assert len(transport.calls) == 2
 

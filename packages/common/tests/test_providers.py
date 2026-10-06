@@ -15,6 +15,54 @@ def test_fake_llm_records_calls() -> None:
     assert llm.calls[0]["system"] == "s"
 
 
+def _admin_config() -> object:
+    from common.llm_config import EffectiveLlm
+
+    return EffectiveLlm(
+        base_url="http://oracle.local:8000/v1",
+        api_key="inf-key",
+        model="translategemma:4b",
+        source="admin",
+    )
+
+
+def test_factory_uses_admin_config_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_BASE_URL", "https://openrouter.ai/api/v1")
+    monkeypatch.setenv("LLM_API_KEY", "env-key")
+    monkeypatch.setenv("LLM_MODEL", "openai/gpt-4o-mini")
+    monkeypatch.setattr("common.llm_config.get_effective_llm", lambda tool=None: _admin_config())
+    factory.reset_providers()
+    provider = factory.get_llm_provider()
+    assert isinstance(provider, OpenAICompatibleLLM)
+    assert provider.base_url == "http://oracle.local:8000/v1"
+    assert provider.model == "translategemma:4b"
+
+
+def test_factory_tool_is_forwarded_to_resolver(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict = {}
+    from common.llm_config import EffectiveLlm
+
+    def fake(tool: str | None = None) -> EffectiveLlm:
+        seen["tool"] = tool
+        return EffectiveLlm(base_url="", api_key=None, model="m", source="env")
+
+    monkeypatch.setattr("common.llm_config.get_effective_llm", fake)
+    factory.reset_providers()
+    factory.get_llm_provider(tool="translate")
+    assert seen["tool"] == "translate"
+
+
+def test_explicit_model_keeps_env_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_BASE_URL", "https://openrouter.ai/api/v1")
+    monkeypatch.setenv("LLM_API_KEY", "env-key")
+    monkeypatch.setattr("common.llm_config.get_effective_llm", lambda tool=None: _admin_config())
+    factory.reset_providers()
+    provider = factory.get_llm_provider_for_model("custom-model")
+    assert isinstance(provider, OpenAICompatibleLLM)
+    assert provider.base_url == "https://openrouter.ai/api/v1"
+    assert provider.model == "custom-model"
+
+
 class _FakeResponse:
     def raise_for_status(self) -> None:
         pass

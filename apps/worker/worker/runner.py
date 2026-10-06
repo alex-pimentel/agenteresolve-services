@@ -40,7 +40,7 @@ def _build_context(job: Job, payload: dict[str, Any], object_store: ObjectStore)
         object_store=object_store,
         input_key=payload["input_key"],
         params=payload.get("params", {}),
-        llm=factory.get_llm_provider(),
+        llm=factory.get_llm_provider(tool=job.tool),
         translate_llm=(
             factory.get_llm_provider_for_model(translate_model) if translate_model else None
         ),

@@ -46,39 +46,48 @@ def reset_providers() -> None:
     get_settings.cache_clear()
 
 
-def get_llm_provider() -> LLMProvider:
-    if _llm_override is not None:
-        return _llm_override
+def _build_llm(base_url: str, api_key: str, model: str) -> LLMProvider:
     settings = get_settings()
-    base_url = settings.llm_base_url
-    if not base_url and settings.llm_api_key:
-        base_url = OPENROUTER_BASE_URL
     if base_url:
         return OpenAICompatibleLLM(
             base_url=base_url,
-            api_key=settings.llm_api_key or "",
-            model=settings.llm_model,
-            timeout=settings.llm_timeout,
-        )
-    return LocalLLM(settings.llm_model)
-
-
-def get_llm_provider_for_model(model: str | None) -> LLMProvider:
-    """Como :func:`get_llm_provider`, mas com um modelo específico (ex.: tradução)."""
-    if not model:
-        return get_llm_provider()
-    settings = get_settings()
-    base_url = settings.llm_base_url
-    if not base_url and settings.llm_api_key:
-        base_url = OPENROUTER_BASE_URL
-    if base_url:
-        return OpenAICompatibleLLM(
-            base_url=base_url,
-            api_key=settings.llm_api_key or "",
+            api_key=api_key,
             model=model,
             timeout=settings.llm_timeout,
         )
     return LocalLLM(model)
+
+
+def get_llm_provider(*, tool: str | None = None) -> LLMProvider:
+    if _llm_override is not None:
+        return _llm_override
+    from common import llm_config
+
+    effective = llm_config.get_effective_llm(tool)
+    if effective.source == "admin" and effective.base_url:
+        settings = get_settings()
+        return OpenAICompatibleLLM(
+            base_url=effective.base_url,
+            api_key=effective.api_key or "",
+            model=effective.model,
+            timeout=settings.llm_timeout,
+        )
+    settings = get_settings()
+    base_url = settings.llm_base_url
+    if not base_url and settings.llm_api_key:
+        base_url = OPENROUTER_BASE_URL
+    return _build_llm(base_url or "", settings.llm_api_key or "", settings.llm_model)
+
+
+def get_llm_provider_for_model(model: str | None, *, tool: str | None = None) -> LLMProvider:
+    """Como :func:`get_llm_provider`, mas com um modelo específico (ex.: tradução)."""
+    if not model:
+        return get_llm_provider(tool=tool)
+    settings = get_settings()
+    base_url = settings.llm_base_url
+    if not base_url and settings.llm_api_key:
+        base_url = OPENROUTER_BASE_URL
+    return _build_llm(base_url or "", settings.llm_api_key or "", model)
 
 
 def get_embeddings_provider() -> EmbeddingsProvider:
