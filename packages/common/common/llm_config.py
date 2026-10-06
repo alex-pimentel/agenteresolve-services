@@ -104,6 +104,9 @@ def get_effective_llm(tool: str | None = None, transport: Any = None) -> Effecti
         if time.monotonic() - stored_at < CACHE_TTL_SECONDS:
             return config
     admin = _fetch_admin(tool, transport=transport)
+    if admin is not None and not admin.api_key:
+        logger.info("llm-config has no key yet, using env fallback")
+        admin = None
     config = admin if admin is not None else _env_config()
     _CACHE[key] = (time.monotonic(), config)
     return config
