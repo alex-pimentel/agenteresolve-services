@@ -12,7 +12,9 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg ca-certificates nodejs \
     && rm -rf /var/lib/apt/lists/* \
-    && node --version
+    && (command -v node || ln -s "$(command -v nodejs)" /usr/local/bin/node) \
+    && node --version \
+    && python3 -c "import shutil; assert shutil.which('node'), 'node ausente no PATH'"
 
 WORKDIR /app
 

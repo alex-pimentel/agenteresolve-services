@@ -119,9 +119,11 @@ def youtube_mp3(body: dict, authorization: str | None = Header(default=None)) ->
             timeout=280,
         )
     except subprocess.CalledProcessError as exc:
-        stderr = (exc.stderr or b"").decode("utf-8", errors="replace")[-500:]
+        stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
+        err_lines = [line for line in stderr.splitlines() if "ERROR" in line]
+        detail = "; ".join(err_lines[-2:]) or stderr[-500:]
         raise HTTPException(
-            status_code=422, detail=f"Falha ao baixar/convertar: {stderr or 'yt-dlp error'}"
+            status_code=422, detail=f"Falha ao baixar/convertar: {detail[-500:]}"
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise HTTPException(

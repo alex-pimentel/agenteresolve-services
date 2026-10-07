@@ -132,8 +132,10 @@ def _via_local(url: str, quality: str) -> bytes:
         try:
             subprocess.run(cmd, check=True, capture_output=True, timeout=280)  # nosec B603
         except subprocess.CalledProcessError as exc:
-            stderr = (exc.stderr or b"").decode("utf-8", errors="replace")[-500:]
-            raise ValueError(f"Falha ao baixar/convertar: {stderr or 'yt-dlp error'}") from exc
+            stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
+            err_lines = [line for line in stderr.splitlines() if "ERROR" in line]
+            detail = "; ".join(err_lines[-2:]) or stderr[-500:]
+            raise ValueError(f"Falha ao baixar/convertar: {detail[-500:]}") from exc
         except subprocess.TimeoutExpired as exc:
             raise ValueError("Tempo limite de conversão excedido (vídeo muito longo?).") from exc
         mp3 = Path(tmp) / "audio.mp3"
