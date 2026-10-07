@@ -100,6 +100,20 @@ def _via_oracle(url: str, quality: str, media_url: str, media_key: str | None) -
     return data
 
 
+_PLAYER_CLIENTS = ("android", "ios", "tv", "web")
+
+
+def _is_bot_check(output: str) -> bool:
+    return any(
+        marker in output
+        for marker in (
+            "Sign in to confirm you’re not a bot",
+            "Sign in to confirm you're not a bot",
+            "Sign in to confirm your age",
+        )
+    )
+
+
 def _via_local(url: str, quality: str) -> bytes:
     ytdlp = shutil.which("yt-dlp")
     ffmpeg = shutil.which("ffmpeg")
@@ -109,36 +123,47 @@ def _via_local(url: str, quality: str) -> bytes:
         )
     with tempfile.TemporaryDirectory(prefix="yt2mp3-") as tmp:
         out = str(Path(tmp) / "audio.%(ext)s")
-        cmd = [
-            ytdlp,
-            "--no-playlist",
-            "--match-filter",
-            f"duration < {_MAX_VIDEO_SECONDS}",
-            "--remote-components",
-            "ejs:github",
-            "-x",
-            "--audio-format",
-            "mp3",
-            "--audio-quality",
-            f"{quality}K",
-            "--ffmpeg-location",
-            ffmpeg,
-            "-o",
-            out,
-            url,
-        ]
+        last_error = "yt-dlp error"
         try:
-            subprocess.run(cmd, check=True, capture_output=True, timeout=280)  # nosec B603
-        except subprocess.CalledProcessError as exc:
-            stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
-            err_lines = [line for line in stderr.splitlines() if "ERROR" in line]
-            detail = "; ".join(err_lines[-2:]) or stderr[-500:]
-            raise ValueError(f"Falha ao baixar/convertar: {detail[-500:]}") from exc
+            for client in _PLAYER_CLIENTS:
+                cmd = [
+                    ytdlp,
+                    "--no-playlist",
+                    "--match-filter",
+                    f"duration < {_MAX_VIDEO_SECONDS}",
+                    "--remote-components",
+                    "ejs:github",
+                    "--extractor-args",
+                    f"youtube:player_client={client}",
+                    "-x",
+                    "--audio-format",
+                    "mp3",
+                    "--audio-quality",
+                    f"{quality}K",
+                    "--ffmpeg-location",
+                    ffmpeg,
+                    "-o",
+                    out,
+                    url,
+                ]
+                try:
+                    subprocess.run(cmd, check=True, capture_output=True, timeout=280)  # nosec B603
+                    break
+                except subprocess.CalledProcessError as exc:
+                    stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
+                    err_lines = [line for line in stderr.splitlines() if "ERROR" in line]
+                    last_error = (
+                        f"(client={client}): {'; '.join(err_lines[-2:]) or stderr[-500:]}"
+                    )
+                    if "Sign in to confirm" not in stderr:
+                        break
+            else:
+                raise ValueError(f"Falha ao baixar/converter: {last_error[-500:]}")
         except subprocess.TimeoutExpired as exc:
             raise ValueError("Tempo limite de conversão excedido (vídeo muito longo?).") from exc
         mp3 = Path(tmp) / "audio.mp3"
         if not mp3.exists():
-            raise ValueError("Conversão não gerou o MP3 (vídeo indisponível ou restrito?).")
+            raise ValueError(f"Falha ao baixar/converter: {last_error[-500:]}")
         return mp3.read_bytes()
 
 

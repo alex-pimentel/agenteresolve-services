@@ -120,37 +120,10 @@ def youtube_mp3(body: dict, authorization: str | None = Header(default=None)) ->
     tmp = tempfile.mkdtemp(prefix="yt2mp3-")
     out = str(Path(tmp) / "audio.%(ext)s")
     try:
-        subprocess.run(  # nosec B603 - fixed argv, no shell
-            [
-                ytdlp,
-                "--no-playlist",
-                "--match-filter",
-                f"duration < {_MAX_VIDEO_SECONDS}",
-                "--remote-components",
-                "ejs:github",
-                "-x",
-                "--audio-format",
-                "mp3",
-                "--audio-quality",
-                f"{quality}K",
-                "--ffmpeg-location",
-                ffmpeg,
-                "-o",
-                out,
-                url,
-            ],
-            check=True,
-            capture_output=True,
-            timeout=280,
-        )
-    except subprocess.CalledProcessError as exc:
-        stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
-        stdout = (exc.stdout or b"").decode("utf-8", errors="replace")
-        err_lines = [line for line in stderr.splitlines() if "ERROR" in line]
-        detail = "; ".join(err_lines[-3:]) or stderr[-1500:] or stdout[-500:]
+        _convert(ytdlp, ffmpeg, url, quality, out)
+    except ValueError as exc:
         raise HTTPException(
-            status_code=422,
-            detail=f"Falha ao baixar/converter (rc={exc.returncode}): {detail[-1500:]}",
+            status_code=422, detail=f"Falha ao baixar/converter: {exc}"
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise HTTPException(
@@ -164,3 +137,60 @@ def youtube_mp3(body: dict, authorization: str | None = Header(default=None)) ->
         media_type="audio/mpeg",
         filename=f"youtube-{video_id}-{quality}k.mp3",
     )
+
+
+# Player clients tentados em ordem. O client `web` sofre bot-check em IPs de
+# datacenter ("Sign in to confirm you're not a bot"); os clients móveis/TV usam
+# outra superfície da API e normalmente passam sem cookies.
+_PLAYER_CLIENTS = ("android", "ios", "tv", "web")
+
+
+def _is_bot_check(output: str) -> bool:
+    markers = (
+        "Sign in to confirm you’re not a bot",
+        "Sign in to confirm you're not a bot",
+        "Sign in to confirm your age",
+    )
+    return any(marker in output for marker in markers)
+
+
+def _convert(ytdlp: str, ffmpeg: str, url: str, quality: str, out: str) -> None:
+    """Run yt-dlp, falling back across player clients on bot-check failures."""
+    last_error = "yt-dlp error"
+    for client in _PLAYER_CLIENTS:
+        cmd = [
+            ytdlp,
+            "--no-playlist",
+            "--match-filter",
+            f"duration < {_MAX_VIDEO_SECONDS}",
+            "--remote-components",
+            "ejs:github",
+            "--extractor-args",
+            f"youtube:player_client={client}",
+            "-x",
+            "--audio-format",
+            "mp3",
+            "--audio-quality",
+            f"{quality}K",
+            "--ffmpeg-location",
+            ffmpeg,
+            "-o",
+            out,
+            url,
+        ]
+        try:
+            subprocess.run(  # nosec B603 - fixed argv, no shell
+                cmd, check=True, capture_output=True, timeout=280
+            )
+            return
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
+            stdout = (exc.stdout or b"").decode("utf-8", errors="replace")
+            err_lines = [line for line in stderr.splitlines() if "ERROR" in line]
+            last_error = (
+                f"(rc={exc.returncode}, client={client}): "
+                f"{'; '.join(err_lines[-3:]) or stderr[-1500:] or stdout[-500:]}"
+            )
+            if not _is_bot_check(stderr) and not _is_bot_check(stdout):
+                break
+    raise ValueError(last_error[-1500:])
