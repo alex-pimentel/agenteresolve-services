@@ -147,10 +147,12 @@ def youtube_mp3(body: dict, authorization: str | None = Header(default=None)) ->
         )
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or b"").decode("utf-8", errors="replace")
+        stdout = (exc.stdout or b"").decode("utf-8", errors="replace")
         err_lines = [line for line in stderr.splitlines() if "ERROR" in line]
-        detail = "; ".join(err_lines[-3:]) or stderr[-2000:]
+        detail = "; ".join(err_lines[-3:]) or stderr[-1500:] or stdout[-500:]
         raise HTTPException(
-            status_code=422, detail=f"Falha ao baixar/convertar: {detail[-2000:]}"
+            status_code=422,
+            detail=f"Falha ao baixar/converter (rc={exc.returncode}): {detail[-1500:]}",
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise HTTPException(
