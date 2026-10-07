@@ -59,6 +59,11 @@ def _video_id(url: str) -> str:
     raise HTTPException(status_code=422, detail="Não encontrei o id do vídeo nessa URL.")
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"status": "ok", "service": "media"}
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     ytdlp = shutil.which("yt-dlp")

@@ -14,8 +14,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-COPY media ./media
+# Workspace completo: `uv sync --frozen --package media` resolve a partir da raiz.
+COPY pyproject.toml uv.lock .python-version ./
+COPY packages ./packages
+COPY apps ./apps
 
 RUN uv sync --frozen --no-dev --package media
 
