@@ -67,6 +67,21 @@ class R2ObjectStore:
             region_name=region,
             config=Config(signature_version="s3v4"),
         )
+        self._ensure_bucket()
+
+    def _ensure_bucket(self) -> None:
+        """Create the bucket on first boot (fresh MinIO/R2); never fail hard."""
+        import logging
+
+        try:
+            self._client.head_bucket(Bucket=self.bucket)
+        except Exception:
+            try:
+                self._client.create_bucket(Bucket=self.bucket)
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "Could not ensure bucket '%s': %s", self.bucket, exc
+                )
 
     def put_bytes(
         self, key: str, data: bytes, content_type: str = "application/octet-stream"
