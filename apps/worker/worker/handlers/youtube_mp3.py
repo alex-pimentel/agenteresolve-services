@@ -154,10 +154,16 @@ def handle_youtube2mp3(ctx: HandlerContext) -> HandlerResult:
     quality = _quality(ctx.params)
 
     settings = get_settings()
-    if settings.media_url:
+    # Local first when the binaries exist (Oracle workers convert in-process,
+    # no HTTP hop); remote Oracle media endpoint as fallback for light workers.
+    if shutil.which("yt-dlp") and shutil.which("ffmpeg"):
+        data = _via_local(raw, quality)
+    elif settings.media_url:
         data = _via_oracle(raw, quality, settings.media_url, settings.media_key)
     else:
-        data = _via_local(raw, quality)
+        raise ProviderUnavailable(
+            "youtube2mp3 requires yt-dlp + ffmpeg locally or the Oracle media endpoint"
+        )
 
     key = f"results/youtube2mp3/{ctx.task_id}/{video_id}-{quality}k.mp3"
     return HandlerResult(key=key, data=data, content_type="audio/mpeg")

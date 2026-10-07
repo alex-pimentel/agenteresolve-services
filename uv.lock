@@ -2117,6 +2117,7 @@ dependencies = [
     { name = "celery", extra = ["redis"] },
     { name = "common" },
     { name = "httpx" },
+    { name = "yt-dlp" },
 ]
 
 [package.metadata]
@@ -2124,6 +2125,7 @@ requires-dist = [
     { name = "celery", extras = ["redis"], specifier = ">=5.4" },
     { name = "common", editable = "packages/common" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "yt-dlp", specifier = ">=2024.1" },
 ]
 
 [[package]]
