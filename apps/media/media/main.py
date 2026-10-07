@@ -124,8 +124,6 @@ def youtube_mp3(body: dict, authorization: str | None = Header(default=None)) ->
             [
                 ytdlp,
                 "--no-playlist",
-                "--max-downloads",
-                "1",
                 "--match-filter",
                 f"duration < {_MAX_VIDEO_SECONDS}",
                 "--remote-components",

@@ -112,8 +112,6 @@ def _via_local(url: str, quality: str) -> bytes:
         cmd = [
             ytdlp,
             "--no-playlist",
-            "--max-downloads",
-            "1",
             "--match-filter",
             f"duration < {_MAX_VIDEO_SECONDS}",
             "--remote-components",
