@@ -1,5 +1,8 @@
 # Oracle media service: yt-dlp + ffmpeg for YouTube -> MP3.
 # Deployed via Coolify on the Oracle server (tailnet-only, port 8001).
+#
+# NOTE: Coolify builds with context = base_directory (/apps/media), so this
+# Dockerfile is intentionally self-contained (plain pip, no uv workspace).
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -10,19 +13,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-
 WORKDIR /app
 
-# Workspace completo: `uv sync --frozen --package media` resolve a partir da raiz.
-COPY pyproject.toml uv.lock .python-version ./
-COPY packages ./packages
-COPY apps ./apps
+COPY media ./media
 
-RUN uv sync --frozen --no-dev --package media
-
-ENV PATH="/app/.venv/bin:$PATH"
+RUN pip install --no-cache-dir "fastapi>=0.115" "uvicorn>=0.30" "yt-dlp==2026.8.19"
 
 EXPOSE 8001
 
-CMD ["uvicorn", "media.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["python", "-m", "uvicorn", "media.main:app", "--host", "0.0.0.0", "--port", "8001"]
