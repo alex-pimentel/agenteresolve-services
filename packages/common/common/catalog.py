@@ -1,4 +1,4 @@
-"""Canonical tool catalogue: the single source of truth for the 18 slugs.
+"""Canonical tool catalogue: the single source of truth for the 19 slugs.
 
 The gateway uses this registry to route requests and expose tool metadata (queue, input
 kind, result kind, size limits) and to reject client-side tools. The worker uses the
@@ -136,6 +136,16 @@ _TOOLS: tuple[ToolSpec, ...] = (
         25 * _MB,
         input_kind="audio",
         result_kind="audio",
+    ),
+    ToolSpec(
+        "youtube2mp3",
+        "YouTube2MP3",
+        "audio",
+        "audio",
+        4 * _KB,
+        input_kind="text",
+        result_kind="audio",
+        notes="URL-only input; heavy yt-dlp + ffmpeg conversion runs via the Oracle media endpoint",
     ),
 )
 

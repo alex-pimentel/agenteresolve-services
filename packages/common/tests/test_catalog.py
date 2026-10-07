@@ -20,12 +20,13 @@ EXPECTED = {
     "tts",
     "audio-enhance",
     "voicechat",
+    "youtube2mp3",
 }
 
 
 def test_catalog_has_eighteen_slugs() -> None:
     assert set(SLUGS) == EXPECTED
-    assert len(SLUGS) == 18
+    assert len(SLUGS) == 19
 
 
 def test_every_gateway_tool_is_implemented() -> None:
@@ -44,6 +45,9 @@ def test_tool_metadata_fields() -> None:
     assert get_tool("anonymize").result_kind == "image"
     assert get_tool("tts").input_kind == "text"
     assert get_tool("tts").result_kind == "audio"
+    assert get_tool("youtube2mp3").input_kind == "text"
+    assert get_tool("youtube2mp3").result_kind == "audio"
+    assert get_tool("youtube2mp3").queue == "audio"
 
 
 def test_queue_assignment_by_category() -> None:

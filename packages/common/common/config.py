@@ -87,6 +87,15 @@ class Settings(BaseSettings):
     tts_url: str | None = None
     tts_key: str | None = None
 
+    # --- Media (YouTube -> MP3; heavy yt-dlp + ffmpeg on Oracle) ---------------
+    # Remote: {MEDIA_URL}/youtube-mp3 with {"url", "quality"}. Keeps yt-dlp +
+    # ffmpeg off the Coolify workers; the Oracle host (tailnet) owns the binaries
+    # and does the download + transcode. Local fallback runs yt-dlp + ffmpeg
+    # when MEDIA_URL is unset (dev only).
+    media_url: str | None = None
+    media_key: str | None = None
+    media_timeout: float = 300.0
+
     # Outbound fetch guard (SEO URL import) -----------------------------------
     fetch_timeout: float = 10.0
     ssrf_block_private: bool = True

@@ -13,10 +13,10 @@ function renderPage() {
 }
 
 describe('CatalogPage', () => {
-  it('renders the heading and all 16 tool cards', () => {
+  it('renders the heading and all 17 tool cards', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: 'Ferramentas de IA' })).toBeInTheDocument();
-    expect(screen.getAllByTestId('tool-card')).toHaveLength(16);
+    expect(screen.getAllByTestId('tool-card')).toHaveLength(17);
   });
 
   it('groups tools under the four category headings', () => {
@@ -29,6 +29,10 @@ describe('CatalogPage', () => {
   it('links each card to its tool route', () => {
     renderPage();
     expect(screen.getByRole('link', { name: /translator/i })).toHaveAttribute('href', '/translate');
+    expect(screen.getByRole('link', { name: /youtube2mp3/i })).toHaveAttribute(
+      'href',
+      '/youtube2mp3',
+    );
     expect(screen.getByRole('link', { name: /louder/i })).toHaveAttribute('href', '/louder');
   });
 

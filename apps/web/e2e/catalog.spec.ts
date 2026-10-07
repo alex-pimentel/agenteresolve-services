@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-test('catalog loads and lists the 16 tools by category', async ({ page }) => {
+test('catalog loads and lists the 17 tools by category', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Ferramentas de IA' })).toBeVisible();
-  await expect(page.getByTestId('tool-card')).toHaveCount(16);
+  await expect(page.getByTestId('tool-card')).toHaveCount(17);
 
   await expect(page.getByRole('heading', { name: 'No navegador' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Texto e LLM' })).toBeVisible();
