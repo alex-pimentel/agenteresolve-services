@@ -62,15 +62,29 @@ def _video_id(url: str) -> str:
 @app.get("/")
 def root() -> dict[str, str | None]:
     import importlib.metadata
+    import subprocess as _sp
 
     try:
         yt_dlp_version: str | None = importlib.metadata.version("yt-dlp")
     except importlib.metadata.PackageNotFoundError:
         yt_dlp_version = None
+
+    def _ver(binary: str | None) -> str | None:
+        if not binary:
+            return None
+        try:
+            out = _sp.run([binary, "--version"], capture_output=True, timeout=10)
+            return out.stdout.decode().strip() or out.stderr.decode().strip() or "?"
+        except Exception:
+            return "exec-failed"
+
     return {
         "status": "ok",
         "service": "media",
         "node": shutil.which("node"),
+        "node_version": _ver(shutil.which("node")),
+        "deno": shutil.which("deno"),
+        "deno_version": _ver(shutil.which("deno")),
         "ffmpeg": shutil.which("ffmpeg"),
         "yt_dlp": shutil.which("yt-dlp"),
         "yt_dlp_version": yt_dlp_version,
