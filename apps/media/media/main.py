@@ -60,8 +60,21 @@ def _video_id(url: str) -> str:
 
 
 @app.get("/")
-def root() -> dict[str, str]:
-    return {"status": "ok", "service": "media"}
+def root() -> dict[str, str | None]:
+    import importlib.metadata
+
+    try:
+        yt_dlp_version: str | None = importlib.metadata.version("yt-dlp")
+    except importlib.metadata.PackageNotFoundError:
+        yt_dlp_version = None
+    return {
+        "status": "ok",
+        "service": "media",
+        "node": shutil.which("node"),
+        "ffmpeg": shutil.which("ffmpeg"),
+        "yt_dlp": shutil.which("yt-dlp"),
+        "yt_dlp_version": yt_dlp_version,
+    }
 
 
 @app.get("/health")
