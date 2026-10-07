@@ -137,16 +137,6 @@ _TOOLS: tuple[ToolSpec, ...] = (
         input_kind="audio",
         result_kind="audio",
     ),
-    ToolSpec(
-        "youtube2mp3",
-        "YouTube2MP3",
-        "audio",
-        "audio",
-        4 * _KB,
-        input_kind="text",
-        result_kind="audio",
-        notes="URL-only input; heavy yt-dlp + ffmpeg conversion runs via the Oracle media endpoint",
-    ),
 )
 
 CATALOG: dict[str, ToolSpec] = {tool.slug: tool for tool in _TOOLS}

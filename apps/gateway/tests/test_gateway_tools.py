@@ -248,22 +248,6 @@ def test_audio_enhance_gateway_flow(client: TestClient) -> None:
     assert job["status"] == "done"
 
 
-def test_youtube2mp3_gateway_flow(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    import worker.handlers.youtube_mp3 as yt_mod
-
-    monkeypatch.setattr(yt_mod, "_via_local", lambda url, quality: b"ID3fake")
-    job = _run(client, "youtube2mp3", text="https://youtu.be/dQw4w9WgXcQ", quality="192")
-    assert job["status"] == "done"
-    assert "results/youtube2mp3" in job["result_url"]
-
-
-def test_youtube2mp3_rejects_non_youtube(client: TestClient) -> None:
-    created = client.post("/api/youtube2mp3/", json={"text": "https://example.com/x"})
-    assert created.status_code == 202
-    job = client.get(f"/api/youtube2mp3/{created.json()['task_id']}").json()
-    assert job["status"] == "error"
-
-
 # --- sessions --------------------------------------------------------------------
 
 

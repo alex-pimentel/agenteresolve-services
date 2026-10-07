@@ -20,7 +20,6 @@ from worker.handlers.vision import (
     handle_ocr,
 )
 from worker.handlers.voice import handle_voicechat
-from worker.handlers.youtube_mp3 import handle_youtube2mp3
 
 Handler = Callable[[HandlerContext], HandlerResult]
 
@@ -40,7 +39,6 @@ HANDLERS: dict[str, Handler] = {
     "tts": handle_tts,
     "audio-enhance": handle_audio_enhance,
     "voicechat": handle_voicechat,
-    "youtube2mp3": handle_youtube2mp3,
 }
 
 

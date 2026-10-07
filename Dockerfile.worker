@@ -16,20 +16,6 @@ COPY apps ./apps
 
 RUN uv sync --frozen --no-dev --all-packages
 
-# youtube2mp3 local conversion (workers run on Oracle): ffmpeg + JS runtimes
-# for yt-dlp (deno default, node 20 fallback) + yt-dlp binary via worker deps.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl unzip gnupg \
-    && rm -rf /var/lib/apt/lists/* \
-    && (curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh || echo "deno indisponível, seguindo só com node") \
-    && mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/* \
-    && ffmpeg -version 2>/dev/null | head -1
-
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Heavy queues run one job at a time; models are loaded lazily on first use.

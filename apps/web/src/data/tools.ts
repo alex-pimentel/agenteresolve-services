@@ -2,7 +2,6 @@ import {
   Accessibility,
   AudioLines,
   Boxes,
-  Disc3,
   EyeOff,
   FileJson,
   Languages,
@@ -475,33 +474,6 @@ export const TOOLS: ToolConfig[] = [
       { name: 'persona', label: 'Persona', type: 'text', placeholder: 'ex.: assistente útil' },
       { name: 'lang', label: 'Idioma', type: 'select', defaultValue: 'pt', choices: LANG_CHOICES },
     ],
-  },
-  {
-    slug: 'youtube2mp3',
-    name: 'YouTube2MP3',
-    description: 'Converta vídeos do YouTube em MP3 com a qualidade à sua escolha.',
-    category: 'audio',
-    input: 'text',
-    maxBytes: 4 * KB,
-    implemented: true,
-    beta: false,
-    result: 'audio',
-    icon: Disc3,
-    route: 'gateway',
-    options: [
-      {
-        name: 'quality',
-        label: 'Qualidade',
-        type: 'select',
-        defaultValue: '192',
-        choices: [
-          { value: '128', label: '128 kbps' },
-          { value: '192', label: '192 kbps' },
-          { value: '320', label: '320 kbps' },
-        ],
-      },
-    ],
-    note: 'Cole o link do vídeo (watch, youtu.be, Shorts ou embed). A conversão roda no servidor (yt-dlp + ffmpeg na Oracle) e o MP3 expira em 24h. Converta apenas conteúdos próprios ou com permissão — respeite os Termos do YouTube e os direitos autorais.',
   },
 ];
 

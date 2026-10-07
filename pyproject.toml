@@ -21,7 +21,7 @@ dev = [
 package = false
 
 [tool.uv.workspace]
-members = ["apps/gateway", "apps/worker", "apps/media", "packages/common"]
+members = ["apps/gateway", "apps/worker", "packages/common"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages/common/tests", "apps/gateway/tests", "apps/worker/tests"]

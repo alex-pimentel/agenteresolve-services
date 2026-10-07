@@ -19,13 +19,12 @@ const EXPECTED_SLUGS = [
   'tts',
   'audio-enhance',
   'voicechat',
-  'youtube2mp3',
 ];
 
 describe('tool catalogue', () => {
-  it('lists the 17 canonical tools with unique slugs', () => {
-    expect(TOOLS).toHaveLength(17);
-    expect(new Set(TOOL_SLUGS).size).toBe(17);
+  it('lists the 16 canonical tools with unique slugs', () => {
+    expect(TOOLS).toHaveLength(16);
+    expect(new Set(TOOL_SLUGS).size).toBe(16);
     expect([...TOOL_SLUGS].sort()).toEqual([...EXPECTED_SLUGS].sort());
   });
 
@@ -40,7 +39,7 @@ describe('tool catalogue', () => {
       (count, category) => count + toolsByCategory(category.id).length,
       0,
     );
-    expect(total).toBe(17);
+    expect(total).toBe(16);
   });
 
   it('marks translate as implemented and louder as client-side', () => {
