@@ -116,6 +116,8 @@ def _via_local(url: str, quality: str) -> bytes:
             "1",
             "--match-filter",
             f"duration < {_MAX_VIDEO_SECONDS}",
+            "--js-runtimes",
+            "node",
             "-x",
             "--audio-format",
             "mp3",

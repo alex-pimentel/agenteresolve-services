@@ -101,6 +101,8 @@ def youtube_mp3(body: dict, authorization: str | None = Header(default=None)) ->
                 "1",
                 "--match-filter",
                 f"duration < {_MAX_VIDEO_SECONDS}",
+                "--js-runtimes",
+                "node",
                 "-x",
                 "--audio-format",
                 "mp3",
