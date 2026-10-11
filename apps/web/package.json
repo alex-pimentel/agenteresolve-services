@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@agenteresolve/ui": "git+https://github.com/alex-pimentel/agenteresolve-ui.git",
-    "lucide-react": "^1.51.0",
+    "lucide-react": "^1.53.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4"
