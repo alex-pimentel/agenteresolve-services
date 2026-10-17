@@ -151,7 +151,15 @@ def _blur_regions(data: bytes, boxes: list[list[float]], mode: str) -> bytes:
 
     image = Image.open(io.BytesIO(data)).convert("RGB")
     for box in boxes:
-        region = tuple(int(round(value)) for value in box[:4])
+        if len(box) < 4:
+            continue
+        # Tupla explícita de 4 inteiros: o Pillow tipa as coordenadas assim.
+        region = (
+            int(round(box[0])),
+            int(round(box[1])),
+            int(round(box[2])),
+            int(round(box[3])),
+        )
         if region[2] <= region[0] or region[3] <= region[1]:
             continue
         crop = image.crop(region)
@@ -159,7 +167,7 @@ def _blur_regions(data: bytes, boxes: list[list[float]], mode: str) -> bytes:
             image.paste(Image.new("RGB", crop.size, (0, 0, 0)), region)
         elif mode == "pixelate":
             small = crop.resize((max(crop.width // 10, 1), max(crop.height // 10, 1)))
-            image.paste(small.resize(crop.size, Image.NEAREST), region)
+            image.paste(small.resize(crop.size, Image.Resampling.NEAREST), region)
         else:
             image.paste(crop.filter(ImageFilter.GaussianBlur(15)), region)
 

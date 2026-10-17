@@ -1,6 +1,7 @@
 import pytest
-from common import catalog
 from common.catalog import CATALOG, SLUGS, get_tool
+
+from common import catalog
 
 EXPECTED = {
     "louder",

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 from common.providers.base import Detection, ProviderUnavailable
 from common.providers.llm import FakeLLM
 from worker.handlers.base import HandlerContext
 from worker.handlers.vision import (
+    _blur_regions,
     handle_alttext,
     handle_anonymize,
     handle_objectcount,
@@ -161,3 +163,54 @@ def test_anonymize_blur_requires_pillow(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(mod, "_blur_regions", _raise)
     with pytest.raises(ProviderUnavailable):
         handle_anonymize(ctx)
+
+
+# --- _blur_regions ---------------------------------------------------------------
+
+
+def _pattern_png(size: int = 40) -> bytes:
+    """PNG com gradiente: garante que pixelate/blur mudem de fato a região."""
+    import io
+
+    from PIL import Image
+
+    image = Image.new("RGB", (size, size))
+    for x in range(size):
+        for y in range(size):
+            image.putpixel((x, y), (x * 6 % 256, y * 6 % 256, 128))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _decode(data: bytes) -> Any:
+    import io
+
+    from PIL import Image
+
+    return Image.open(io.BytesIO(data)).convert("RGB")
+
+
+def test_blur_regions_applies_each_mode_only_to_the_target_box() -> None:
+    box = [10.0, 10.0, 30.0, 30.0]
+    original = _decode(_pattern_png())
+
+    for mode in ("blur", "black", "pixelate"):
+        redacted = _decode(_blur_regions(_pattern_png(), [box], mode))
+
+        assert redacted.size == original.size
+        assert redacted.crop(tuple(box)).tobytes() != original.crop(tuple(box)).tobytes(), mode
+        assert redacted.crop((0, 0, 10, 40)).tobytes() == original.crop((0, 0, 10, 40)).tobytes(), (
+            mode
+        )
+        if mode == "black":
+            assert redacted.getpixel((20, 20)) == (0, 0, 0)
+
+
+def test_blur_regions_ignores_degenerate_and_incomplete_boxes() -> None:
+    original = _decode(_pattern_png())
+    redacted = _decode(
+        _blur_regions(_pattern_png(), [[10.0, 10.0, 10.0, 30.0], [5.0, 5.0]], "black")
+    )
+
+    assert redacted.tobytes() == original.tobytes()

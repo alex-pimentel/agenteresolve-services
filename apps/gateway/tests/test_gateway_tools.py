@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from typing import Any, cast
 
 import pytest
 from common.jobs import InMemoryJobStore, set_job_store
@@ -125,7 +126,11 @@ def _run(client: TestClient, slug: str, *, method: str = "json", **kwargs: objec
         created = client.post(f"/api/{slug}/", json=kwargs)
     else:
         files = kwargs.pop("files")
-        created = client.post(f"/api/{slug}/", data=kwargs, files=files)
+        created = client.post(
+            f"/api/{slug}/",
+            data=kwargs,
+            files=cast("dict[str, Any]", files),
+        )
     assert created.status_code == 202, created.text
     task_id = created.json()["task_id"]
     status = client.get(f"/api/{slug}/{task_id}")
