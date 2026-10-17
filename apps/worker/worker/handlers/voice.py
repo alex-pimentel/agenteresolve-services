@@ -51,8 +51,8 @@ def handle_voicechat(ctx: HandlerContext) -> HandlerResult:
         json.dumps(payload, ensure_ascii=False).encode("utf-8"),
         "application/json",
     )
-    audio_key = f"results/voicechat/{ctx.task_id}/reply.mp3"
-    return HandlerResult(key=audio_key, data=audio, content_type="audio/mpeg")
+    audio_key = f"results/voicechat/{ctx.task_id}/reply.wav"
+    return HandlerResult(key=audio_key, data=audio, content_type="audio/wav")
 
 
 __all__: list[Any] = ["handle_voicechat"]

@@ -144,16 +144,62 @@ def logout(authorization: str | None = Header(default=None)) -> dict[str, Any]:
 
 
 @router.post("/api/{slug}/session", tags=["sessions"])
-def create_session(
+async def create_session(
     slug: str,
     request: Request,
     user: dict[str, Any] = Depends(get_required_user),
 ) -> dict[str, Any]:
-    resolve(slug)
+    """Create a session, optionally seeding it with a document.
+
+    Without a body this just registers an ephemeral session id (used by tools that
+    carry state in the object store). For AskYourDocs/DataChat a multipart ``file``
+    (plus optional ``text``) is indexed immediately into the session, so the caller can
+    go straight to ``POST /api/{slug}/{session_id}/ask`` once the returned ``task_id``
+    completes.
+    """
+    spec = resolve(slug)
     session_id = uuid.uuid4().hex
-    store = get_session_store()
-    store.create(session_id, slug)
-    return {"session_id": session_id, "tool": slug, "status": "ready"}
+    get_session_store().create(session_id, slug)
+
+    content_type = request.headers.get("content-type", "")
+    if slug not in ("askyourdocs", "datachat") or not content_type.startswith(
+        "multipart/form-data"
+    ):
+        return {"session_id": session_id, "tool": slug, "status": "ready"}
+
+    form = await request.form()
+    upload = form.get("file")
+    if upload is None or isinstance(upload, str):
+        return {"session_id": session_id, "tool": slug, "status": "ready"}
+
+    params: dict[str, Any] = {
+        "session_id": session_id,
+        "filename": upload.filename or "data.csv",
+    }
+    for key, value in form.items():
+        if key not in ("file", "session_id") and not hasattr(value, "filename"):
+            params[key] = str(value)
+    content = await upload.read()
+    if len(content) > spec.max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Input too large: {len(content)} bytes exceeds limit of {spec.max_bytes}",
+        )
+    task_id = uuid.uuid4().hex
+    job = create_tool_job(
+        slug=slug,
+        params=params,
+        content=content,
+        content_type=upload.content_type or "application/octet-stream",
+        owner_sub=str(user.get("sub", "")),
+        task_id=task_id,
+    )
+    return {
+        "session_id": session_id,
+        "tool": slug,
+        "status": job.status.value,
+        "task_id": job.task_id,
+    }
 
 
 @router.get("/api/{slug}/session/{session_id}", tags=["sessions"])
@@ -340,6 +386,8 @@ async def _parse_input(request: Request, max_bytes: int) -> tuple[dict[str, Any]
         if upload is not None and not isinstance(upload, str):
             content = await upload.read()
             content_type = upload.content_type or "application/octet-stream"
+            if upload.filename:
+                params.setdefault("filename", upload.filename)
         elif form.get("text") is not None:
             content = str(form["text"]).encode("utf-8")
             content_type = "text/plain; charset=utf-8"

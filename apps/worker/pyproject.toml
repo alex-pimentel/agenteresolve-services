@@ -13,17 +13,31 @@ dependencies = [
     "httpx>=0.27",
 ]
 
-# Heavy model/document libraries are NOT declared as dependencies: they are imported
-# lazily inside handlers and installed per-worker-image (or replaced by the matching
-# remote *_URL provider). This keeps the base image small and import-time light.
-# Examples (install in the worker image as needed):
-#   pip install pypdf python-docx      # docuextract / contracts native text
-#   pip install pandas openpyxl        # datachat
-#   pip install Pillow numpy           # anonymize pixel redaction
-#   pip install pytesseract            # local OCR
-#   pip install faster-whisper         # local transcribe/audio-enhance
-#   pip install piper-tts              # local TTS
-#   pip install transformers ultralytics  # local caption/detect
+# Heavy model/document libraries are OPTIONAL extras: handlers import them lazily and
+# fall back to the matching remote *_URL provider when an extra is absent. The worker
+# image installs them with `uv sync --all-extras` so the media pipeline runs fully
+# self-contained (no external inference service required).
+[project.optional-dependencies]
+# Native text extraction for docuextract / contracts.
+pdf = ["pypdf>=5.0", "python-docx>=1.1"]
+# DataChat sandbox.
+data = ["pandas>=2.2", "openpyxl>=3.1"]
+# Local OCR (needs the `tesseract-ocr` system package).
+ocr = ["pytesseract>=0.3.13", "Pillow>=10.4"]
+# Local vision: BLIP captioning (transformers + torch) and YOLO detection (ultralytics).
+vision = [
+    "Pillow>=10.4",
+    "numpy>=1.26",
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "transformers>=4.46",
+    "ultralytics>=8.3",
+]
+# Local transcription/enhancement. `av<19` because faster-whisper 1.2.x uses an `av`
+# kwarg that av>=19 removed; ffmpeg is required on PATH (system package).
+audio = ["faster-whisper>=1.0", "av<19"]
+# Local Piper TTS (needs `espeak-ng`/bundled data; voices download on first use).
+tts = ["piper-tts>=1.3"]
 
 [tool.uv.sources]
 common = { workspace = true }

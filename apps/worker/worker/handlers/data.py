@@ -8,7 +8,7 @@ from typing import Any
 
 from common.jsonutil import json_bytes, parse_json_object
 from common.providers.base import ProviderUnavailable
-from common.sessions import get_session_store
+from common.storage import get_bytes_or_none
 
 from worker.handlers.base import HandlerContext, HandlerResult
 
@@ -74,26 +74,52 @@ def _serialize(value: Any) -> Any:
     return {"value": str(value)}
 
 
+def _data_key(session_id: str) -> str:
+    return f"sessions/datachat/{session_id}/data.bin"
+
+
+def _meta_key(session_id: str) -> str:
+    return f"sessions/datachat/{session_id}/meta.json"
+
+
+def _stored_filename(ctx: HandlerContext, session_id: str) -> str:
+    raw = get_bytes_or_none(ctx.object_store, _meta_key(session_id))
+    if raw is None:
+        return "data.csv"
+    try:
+        return str(json.loads(raw).get("filename") or "data.csv")
+    except (ValueError, AttributeError):
+        return "data.csv"
+
+
 def handle_datachat(ctx: HandlerContext) -> HandlerResult:
     if ctx.llm is None:
         raise ProviderUnavailable("datachat requires an LLM provider")
 
-    raw = ctx.object_store.get_bytes(ctx.input_key)
     filename = str(ctx.params.get("filename") or "data.csv")
     question = str(ctx.params.get("question") or "").strip()
-
     session_id = str(ctx.params.get("session_id") or "")
+
     if question:
-        session = get_session_store().get(session_id)
-        if session is None:
+        # Follow-up turn: reload the dataset from object storage so any worker process
+        # (and any replica) can answer, not just the one that indexed it in memory.
+        if not session_id:
             raise ValueError("Unknown or expired session")
-        frame = session.data["frame"]
-        schema = session.data["schema"]
+        stored = get_bytes_or_none(ctx.object_store, _data_key(session_id))
+        if stored is None:
+            raise ValueError("Unknown or expired session")
+        filename = _stored_filename(ctx, session_id)
+        frame = load_dataframe(stored, filename)
+        schema = dataframe_schema(frame)
     else:
+        raw = ctx.object_store.get_bytes(ctx.input_key)
         frame = load_dataframe(raw, filename)
         schema = dataframe_schema(frame)
-        session_id = uuid.uuid4().hex
-        get_session_store().create(session_id, "datachat", frame=frame, schema=schema)
+        session_id = session_id or uuid.uuid4().hex
+        ctx.object_store.put_bytes(_data_key(session_id), raw, "application/octet-stream")
+        ctx.object_store.put_bytes(
+            _meta_key(session_id), json_bytes({"filename": filename}), "application/json"
+        )
 
     result: dict[str, Any]
     if question:

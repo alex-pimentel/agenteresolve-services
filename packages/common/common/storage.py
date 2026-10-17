@@ -103,6 +103,33 @@ class R2ObjectStore:
         return url
 
 
+def _error_code(exc: BaseException) -> str | None:
+    """Extract an S3/botocore error code from an exception, if present."""
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        error = response.get("Error")
+        if isinstance(error, dict) and isinstance(error.get("Code"), str):
+            return error["Code"]
+    return None
+
+
+def get_bytes_or_none(store: ObjectStore, key: str) -> bytes | None:
+    """Read an object, returning ``None`` when it is missing (any backing store).
+
+    ``InMemoryObjectStore`` raises ``KeyError``; R2/S3 raises ``botocore``
+    ``ClientError`` with code ``NoSuchKey``. Both are normalised here so callers do not
+    depend on the storage backend.
+    """
+    try:
+        return store.get_bytes(key)
+    except KeyError:
+        return None
+    except Exception as exc:  # noqa: BLE001 - backend-specific "not found" variants
+        if _error_code(exc) in ("NoSuchKey", "NoSuchBucket", "404") or "NoSuchKey" in str(exc):
+            return None
+        raise
+
+
 def build_object_store() -> ObjectStore:
     settings = get_settings()
     if settings.r2_endpoint and settings.r2_access_key_id and settings.r2_secret_access_key:

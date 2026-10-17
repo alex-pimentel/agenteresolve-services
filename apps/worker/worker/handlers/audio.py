@@ -84,8 +84,8 @@ def handle_tts(ctx: HandlerContext) -> HandlerResult:
         lang=str(lang) if lang else None,
         speed=speed,
     )
-    key = f"results/tts/{ctx.task_id}/result.mp3"
-    return HandlerResult(key=key, data=audio, content_type="audio/mpeg")
+    key = f"results/tts/{ctx.task_id}/result.wav"
+    return HandlerResult(key=key, data=audio, content_type="audio/wav")
 
 
 def handle_audio_enhance(ctx: HandlerContext) -> HandlerResult:

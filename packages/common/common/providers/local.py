@@ -200,13 +200,46 @@ class LocalAudioProvider:
 # --- TTS --------------------------------------------------------------------------
 
 
+def _voices_dir() -> Any:
+    import os
+    from pathlib import Path
+
+    return Path(os.environ.get("PIPER_VOICES_DIR") or (Path.home() / ".cache" / "piper"))
+
+
 class LocalTtsProvider:
-    """Piper TTS (optional ``piper-tts`` dependency)."""
+    """Piper TTS (optional ``piper-tts`` dependency).
+
+    Voices are resolved from an absolute path when given, otherwise by name from
+    ``PIPER_VOICES_DIR`` (default ``~/.cache/piper``); a missing voice is downloaded on
+    first use via ``piper.download_voices``. Output is a valid WAV container.
+    """
 
     is_remote = False
 
     def __init__(self, model: str | None = None, **_: Any) -> None:
         self.model = model
+        self._voices: dict[str, Any] = {}
+
+    def _voice_path(self, voice_name: str) -> Any:
+        from pathlib import Path
+
+        candidate = Path(voice_name)
+        if candidate.is_file():
+            return candidate
+        directory = _voices_dir()
+        path = directory / f"{voice_name}.onnx"
+        if not path.is_file():
+            directory.mkdir(parents=True, exist_ok=True)
+            download_voice = _require("piper.download_voices").download_voice
+            download_voice(voice_name, directory)
+        return path
+
+    def _voice(self, voice_name: str) -> Any:
+        if voice_name not in self._voices:
+            piper = _require("piper")
+            self._voices[voice_name] = piper.PiperVoice.load(str(self._voice_path(voice_name)))
+        return self._voices[voice_name]
 
     def synthesize(
         self,
@@ -216,14 +249,18 @@ class LocalTtsProvider:
         lang: str | None = None,
         speed: float = 1.0,
     ) -> bytes:
-        piper = _require("piper")
+        import wave
+
+        _require("piper")
         voice_name = voice or _PIPER_DEFAULT.get((lang or "en")[:2], "en_US-lessac-medium")
         try:
-            piper_voice = piper.PiperVoice.load(voice_name)
-            stream = piper_voice.synthesize(text, length_scale=1.0 / max(speed, 0.1))
+            from piper import SynthesisConfig
+
+            config = SynthesisConfig(length_scale=1.0 / max(speed, 0.1))
+            piper_voice = self._voice(voice_name)
             buffer = io.BytesIO()
-            for chunk in stream:
-                buffer.write(chunk.audio_int16_bytes)
+            with wave.open(buffer, "wb") as wav_file:
+                piper_voice.synthesize_wav(text, wav_file, syn_config=config)
             return buffer.getvalue()
         except Exception as exc:  # noqa: BLE001 - mapped to a clear provider error
             raise ProviderUnavailable(

@@ -96,8 +96,8 @@ def test_tts_synthesizes_audio() -> None:
     ctx.object_store._data = b"Hello"  # type: ignore[attr-defined]
     result = handle_tts(ctx)
     assert result.data == b"AUDIO:Hello"
-    assert result.key == "results/tts/t1/result.mp3"
-    assert result.content_type == "audio/mpeg"
+    assert result.key == "results/tts/t1/result.wav"
+    assert result.content_type == "audio/wav"
 
 
 def test_tts_requires_provider() -> None:

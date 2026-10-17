@@ -13,6 +13,7 @@ from typing import Any
 from common.jsonutil import json_bytes, parse_json_object
 from common.providers.base import EmbeddingsProvider, ProviderUnavailable
 from common.sessions import get_session_store
+from common.storage import get_bytes_or_none
 from common.text import chunk_text
 
 from worker.handlers.base import HandlerContext, HandlerResult
@@ -76,10 +77,10 @@ def handle_askyourdocs(ctx: HandlerContext) -> HandlerResult:
     session_id = str(ctx.params.get("session_id") or "") or uuid.uuid4().hex
 
     if question:
-        try:
-            records = json.loads(ctx.object_store.get_bytes(_records_key(session_id)))
-        except KeyError as exc:
-            raise ValueError("Unknown or expired session") from exc
+        stored = get_bytes_or_none(ctx.object_store, _records_key(session_id))
+        if stored is None:
+            raise ValueError("Unknown or expired session")
+        records = json.loads(stored)
         answer = answer_question(ctx.llm, ctx.embeddings, records, question)
         get_session_store().create(session_id, "askyourdocs", records=len(records))
     else:

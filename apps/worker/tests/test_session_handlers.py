@@ -192,7 +192,7 @@ def test_voicechat_runs_a_turn() -> None:
     )
     result = handle_voicechat(ctx)
     assert result.data == b"AUDIO:Hello there"
-    assert result.key == "results/voicechat/t1/reply.mp3"
+    assert result.key == "results/voicechat/t1/reply.wav"
     assert "results/voicechat/t1/turn.json" in store.puts
 
 
