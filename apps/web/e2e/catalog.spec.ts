@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
-test('catalog loads and lists the 17 tools by category', async ({ page }) => {
+test('catalog loads and lists the 18 tools by category', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Ferramentas de IA' })).toBeVisible();
-  await expect(page.getByTestId('tool-card')).toHaveCount(17);
+  await expect(page.getByTestId('tool-card')).toHaveCount(18);
 
   await expect(page.getByRole('heading', { name: 'No navegador' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Texto e LLM' })).toBeVisible();
@@ -12,7 +12,20 @@ test('catalog loads and lists the 17 tools by category', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Áudio' })).toBeVisible();
 });
 
-test('shows a beta badge for stubbed tools', async ({ page }) => {
+test('shows no beta badge while every listed tool is implemented', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('Beta').first()).toBeVisible();
+  await expect(page.getByText('Beta')).toHaveCount(0);
+});
+
+test('client-side tools surface their standalone app link', async ({ page }) => {
+  const clientTools = [
+    { slug: 'louder', app: /abrir louder/i },
+    { slug: 'qrcode', app: /abrir gerador de qr codes/i },
+    { slug: 'imposition', app: /abrir imposition/i },
+  ];
+
+  for (const tool of clientTools) {
+    await page.goto(`/${tool.slug}`);
+    await expect(page.getByRole('link', { name: tool.app })).toBeVisible();
+  }
 });

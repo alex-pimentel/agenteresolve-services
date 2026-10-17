@@ -55,11 +55,22 @@ describe('ToolPage', () => {
     expect(screen.getByRole('heading', { name: 'Ferramenta não encontrada' })).toBeInTheDocument();
   });
 
-  it('surfaces Louder as a client-side link instead of rebuilding it', () => {
-    renderSlug('louder');
-    const link = screen.getByRole('link', { name: /abrir louder/i });
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link.getAttribute('href')).toMatch(/louder/);
+  it('surfaces client-side tools as links instead of rebuilding them', () => {
+    const clientTools = [
+      { slug: 'louder', app: /louder/ },
+      { slug: 'qrcode', app: /qrcode/ },
+      { slug: 'imposition', app: /imposition/ },
+    ];
+
+    for (const tool of clientTools) {
+      const { unmount } = renderSlug(tool.slug);
+      const link = screen.getByRole('link', { name: /^abrir /i });
+
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link.getAttribute('href')).toMatch(tool.app);
+
+      unmount();
+    }
   });
 
   it('renders the Translator form with the target language select', () => {

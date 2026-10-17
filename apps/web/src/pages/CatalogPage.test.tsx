@@ -13,10 +13,10 @@ function renderPage() {
 }
 
 describe('CatalogPage', () => {
-  it('renders the heading and all 16 tool cards', () => {
+  it('renders the heading and all 18 tool cards', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: 'Ferramentas de IA' })).toBeInTheDocument();
-    expect(screen.getAllByTestId('tool-card')).toHaveLength(16);
+    expect(screen.getAllByTestId('tool-card')).toHaveLength(18);
   });
 
   it('groups tools under the four category headings', () => {
@@ -30,6 +30,14 @@ describe('CatalogPage', () => {
     renderPage();
     expect(screen.getByRole('link', { name: /translator/i })).toHaveAttribute('href', '/translate');
     expect(screen.getByRole('link', { name: /louder/i })).toHaveAttribute('href', '/louder');
+    expect(screen.getByRole('link', { name: /gerador de qr codes/i })).toHaveAttribute(
+      'href',
+      '/qrcode',
+    );
+    expect(screen.getByRole('link', { name: /imposition/i })).toHaveAttribute(
+      'href',
+      '/imposition',
+    );
   });
 
   it('renders no beta badges now that every gateway tool is implemented', () => {

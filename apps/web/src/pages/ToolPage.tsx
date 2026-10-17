@@ -30,7 +30,7 @@ import {
 } from '../lib/api';
 import { CLERK_PUBLISHABLE_KEY } from '../lib/env';
 import { SERVICE_NAV } from '../lib/nav';
-import { LouderPage } from './LouderPage';
+import { ClientAppPage } from './ClientAppPage';
 import { NotFoundPage } from './NotFoundPage';
 
 type Phase = 'idle' | 'running';
@@ -218,7 +218,7 @@ export function ToolPage() {
   }
 
   if (tool.route === 'client') {
-    return <LouderPage tool={tool} />;
+    return <ClientAppPage tool={tool} />;
   }
 
   return <GatewayToolPage tool={tool} />;

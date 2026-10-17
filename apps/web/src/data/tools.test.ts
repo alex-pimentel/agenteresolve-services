@@ -4,6 +4,8 @@ import { CATEGORIES, TOOLS, TOOL_SLUGS, formatBytes, getTool, toolsByCategory } 
 
 const EXPECTED_SLUGS = [
   'louder',
+  'qrcode',
+  'imposition',
   'docuextract',
   'askyourdocs',
   'datachat',
@@ -22,9 +24,9 @@ const EXPECTED_SLUGS = [
 ];
 
 describe('tool catalogue', () => {
-  it('lists the 16 canonical tools with unique slugs', () => {
-    expect(TOOLS).toHaveLength(16);
-    expect(new Set(TOOL_SLUGS).size).toBe(16);
+  it('lists the 18 canonical tools with unique slugs', () => {
+    expect(TOOLS).toHaveLength(18);
+    expect(new Set(TOOL_SLUGS).size).toBe(18);
     expect([...TOOL_SLUGS].sort()).toEqual([...EXPECTED_SLUGS].sort());
   });
 
@@ -39,14 +41,18 @@ describe('tool catalogue', () => {
       (count, category) => count + toolsByCategory(category.id).length,
       0,
     );
-    expect(total).toBe(16);
+    expect(total).toBe(18);
   });
 
-  it('marks translate as implemented and louder as client-side', () => {
+  it('marks translate as implemented and the client-side apps as browser-only', () => {
     expect(getTool('translate')?.implemented).toBe(true);
     expect(getTool('translate')?.beta).toBe(false);
-    expect(getTool('louder')?.route).toBe('client');
-    expect(getTool('louder')?.beta).toBe(false);
+
+    for (const slug of ['louder', 'qrcode', 'imposition']) {
+      expect(getTool(slug)?.route).toBe('client');
+      expect(getTool(slug)?.beta).toBe(false);
+      expect(getTool(slug)?.category).toBe('client');
+    }
   });
 
   it('marks every gateway tool as implemented (providers may be unavailable at runtime)', () => {
