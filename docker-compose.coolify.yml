@@ -10,19 +10,18 @@
 # in the app's Environment Variables (Coolify injects them as container env).
 # Do NOT rely on a committed `.env` (it is generated from .env.example for local
 # runs only); `env_file` is marked optional so the compose also parses without it.
+#
+# IMPORTANT — this stack is GATEWAY-ONLY on purpose.
+# The Celery workers must run on the Oracle host, next to the inference service:
+# they reach it container-to-container through the shared Coolify network
+# (`http://inference:8000`), the only path that works from a container on that
+# host. Running a second worker set here (as this file used to) creates a
+# split-brain: both sets consume the same Redis queues, but only the Oracle set
+# can talk to inference, so media jobs failed with "No route to host" whenever
+# the primary worker picked them up. Workers are deployed by
+# `docker-compose.workers.coolify.yml` (see docs/superpowers/infra/scripts/deploy-workers.sh).
 
 name: agenteresolve-services
-
-x-worker: &worker
-  build:
-    context: .
-    dockerfile: Dockerfile.worker
-  env_file:
-    - path: .env
-      required: false
-  restart: unless-stopped
-  volumes:
-    - model-cache:/home/app/.cache
 
 services:
   gateway:
@@ -45,42 +44,3 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-
-  worker-text:
-    <<: *worker
-    command:
-      - celery
-      - -A
-      - worker.celery_app:celery_app
-      - worker
-      - -Q
-      - text
-      - --concurrency=1
-      - --loglevel=INFO
-
-  worker-vision:
-    <<: *worker
-    command:
-      - celery
-      - -A
-      - worker.celery_app:celery_app
-      - worker
-      - -Q
-      - vision
-      - --concurrency=1
-      - --loglevel=INFO
-
-  worker-audio:
-    <<: *worker
-    command:
-      - celery
-      - -A
-      - worker.celery_app:celery_app
-      - worker
-      - -Q
-      - audio
-      - --concurrency=1
-      - --loglevel=INFO
-
-volumes:
-  model-cache:
