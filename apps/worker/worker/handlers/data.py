@@ -22,6 +22,32 @@ _PLAN_SYSTEM = (
 
 _FORBIDDEN = ("import", "open(", "exec", "eval", "__", "os.", "sys.", "subprocess", "socket")
 
+# A small, explicit set of side-effect-free builtins so LLM-generated expressions can use
+# len/sum/min/... Everything else (imports, open, getattr, dunders) stays unavailable.
+_SAFE_BUILTINS: dict[str, Any] = {
+    "abs": abs,
+    "all": all,
+    "any": any,
+    "bool": bool,
+    "dict": dict,
+    "divmod": divmod,
+    "enumerate": enumerate,
+    "float": float,
+    "int": int,
+    "len": len,
+    "list": list,
+    "max": max,
+    "min": min,
+    "range": range,
+    "round": round,
+    "set": set,
+    "sorted": sorted,
+    "str": str,
+    "sum": sum,
+    "tuple": tuple,
+    "zip": zip,
+}
+
 
 def load_dataframe(data: bytes, filename: str) -> Any:
     try:
@@ -56,7 +82,7 @@ def run_sandboxed(frame: Any, code: str) -> Any:
 
     scope: dict[str, Any] = {"df": frame, "pd": pd}
     # Restricted eval over a fixed, validated expression in a stripped scope.
-    return eval(code, {"__builtins__": {}}, scope)  # noqa: S307  # nosec B307
+    return eval(code, {"__builtins__": _SAFE_BUILTINS}, scope)  # noqa: S307  # nosec B307
 
 
 def _serialize(value: Any) -> Any:

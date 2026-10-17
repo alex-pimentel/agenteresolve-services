@@ -91,14 +91,18 @@ class LocalVisionProvider:
     def _captioner(self) -> Any:
         if self._caption_pipeline is None:
             transformers = _require("transformers")
+            # transformers >= 5 exposes BLIP through the "image-text-to-text" pipeline,
+            # which requires an explicit ``text`` argument (see caption()).
             self._caption_pipeline = transformers.pipeline(
-                "image-to-text", model="Salesforce/blip-image-captioning-base"
+                "image-text-to-text", model="Salesforce/blip-image-captioning-base"
             )
         return self._caption_pipeline
 
     def caption(self, data: bytes, *, content_type: str) -> str:
         image = _load_image(data)
-        output = self._captioner()(image)
+        # ``image-text-to-text`` needs both ``images`` and ``text``; BLIP ignores the
+        # text prefix, so an empty prompt yields a plain caption.
+        output = self._captioner()(images=image, text="")
         if isinstance(output, list) and output:
             return str(output[0].get("generated_text", "")).strip()
         return str(output).strip()

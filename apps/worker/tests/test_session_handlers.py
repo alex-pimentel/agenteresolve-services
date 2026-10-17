@@ -151,6 +151,23 @@ def test_datachat_sandbox_blocks_forbidden_code() -> None:
         mod.run_sandboxed(object(), "__import__('os')")
 
 
+def test_datachat_sandbox_allows_safe_builtins(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys
+    import types
+
+    from worker.handlers import data as mod
+
+    # pandas is an optional extra (worker[data]); stub it so the sandbox scope builds.
+    monkeypatch.setitem(sys.modules, "pandas", types.SimpleNamespace())
+
+    class _Frame:
+        def __len__(self) -> int:
+            return 3
+
+    assert mod.run_sandboxed(_Frame(), "len(df)") == 3
+    assert mod.run_sandboxed(_Frame(), "sum([1, 2, 3])") == 6
+
+
 def test_datachat_requires_llm() -> None:
     from worker.handlers import data as mod
 
