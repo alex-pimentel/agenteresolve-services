@@ -40,9 +40,10 @@ describe('CatalogPage', () => {
     );
   });
 
-  it('renders no beta badges now that every gateway tool is implemented', () => {
+  it('does not advertise a beta bucket now that every listed tool is implemented', () => {
     renderPage();
     expect(screen.queryByText('Beta')).not.toBeInTheDocument();
+    expect(screen.getByText('18 ferramentas · 18 disponíveis agora.')).toBeInTheDocument();
     expect(screen.getAllByText('No navegador').length).toBeGreaterThan(0);
   });
 });

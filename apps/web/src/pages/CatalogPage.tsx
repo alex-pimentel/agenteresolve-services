@@ -6,7 +6,9 @@ import { CLERK_PUBLISHABLE_KEY } from '../lib/env';
 import { SERVICE_NAV } from '../lib/nav';
 
 export function CatalogPage() {
-  const available = TOOLS.filter((tool) => !tool.beta).length;
+  const beta = TOOLS.filter((tool) => tool.beta).length;
+  const available = TOOLS.length - beta;
+  const betaSuffix = beta > 0 ? ` · ${beta} em beta` : '';
 
   return (
     <ServiceShell
@@ -16,7 +18,7 @@ export function CatalogPage() {
       description="Um catálogo único de ferramentas de texto, visão e áudio. Sem persistir o seu conteúdo: entradas e resultados expiram em 24h."
     >
       <p className="mb-10 text-sm text-muted-foreground">
-        {TOOLS.length} ferramentas · {available} disponíveis agora · o restante em beta.
+        {TOOLS.length} ferramentas · {available} disponíveis agora{betaSuffix}.
       </p>
 
       <div className="flex flex-col gap-14">

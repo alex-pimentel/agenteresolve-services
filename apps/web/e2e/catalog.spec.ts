@@ -14,7 +14,8 @@ test('catalog loads and lists the 18 tools by category', async ({ page }) => {
 
 test('shows no beta badge while every listed tool is implemented', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('Beta')).toHaveCount(0);
+  await expect(page.getByTestId('tool-card').getByText('Beta', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('o restante em beta')).toHaveCount(0);
 });
 
 test('client-side tools surface their standalone app link', async ({ page }) => {
