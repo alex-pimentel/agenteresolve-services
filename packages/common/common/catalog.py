@@ -1,4 +1,4 @@
-"""Canonical tool catalogue: the single source of truth for the 19 slugs.
+"""Canonical tool catalogue: the single source of truth for the 18 slugs.
 
 The gateway uses this registry to route requests and expose tool metadata (queue, input
 kind, result kind, size limits) and to reject client-side tools. The worker uses the

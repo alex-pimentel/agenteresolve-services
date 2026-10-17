@@ -1,4 +1,5 @@
 import pytest
+from common import catalog
 from common.catalog import CATALOG, SLUGS, get_tool
 
 EXPECTED = {
@@ -26,6 +27,11 @@ EXPECTED = {
 def test_catalog_has_eighteen_slugs() -> None:
     assert set(SLUGS) == EXPECTED
     assert len(SLUGS) == 18
+
+
+def test_module_docstring_agrees_with_the_real_slug_count() -> None:
+    """O docstring declara o catálogo canônico; se ele mentir, alguém vai confiar nele."""
+    assert f"{len(SLUGS)} slugs" in (catalog.__doc__ or "")
 
 
 def test_every_gateway_tool_is_implemented() -> None:
