@@ -2,32 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { CATEGORIES, TOOLS, TOOL_SLUGS, formatBytes, getTool, toolsByCategory } from './tools';
 
-const EXPECTED_SLUGS = [
-  'louder',
-  'qrcode',
-  'imposition',
-  'docuextract',
-  'askyourdocs',
-  'datachat',
-  'feedback',
-  'seo',
-  'translate',
-  'contracts',
-  'ocr',
-  'anonymize',
-  'alttext',
-  'objectcount',
-  'transcribe',
-  'tts',
-  'audio-enhance',
-  'voicechat',
-];
-
 describe('tool catalogue', () => {
-  it('lists the 18 canonical tools with unique slugs', () => {
-    expect(TOOLS).toHaveLength(18);
-    expect(new Set(TOOL_SLUGS).size).toBe(18);
-    expect([...TOOL_SLUGS].sort()).toEqual([...EXPECTED_SLUGS].sort());
+  it('lists the canonical tools with unique slugs', () => {
+    expect(TOOL_SLUGS).toEqual(TOOLS.map((tool) => tool.slug));
+    expect(new Set(TOOL_SLUGS).size).toBe(TOOLS.length);
+    // Quais slugs existem é contrato com o canônico do gateway: quem falha por divergência é
+    // packages/common/tests/test_spa_catalog_contract.py — assim a lista não vive em três lugares
+    // (canônico, este arquivo e o teste).
   });
 
   it('groups every tool under one of the four categories', () => {
@@ -41,7 +22,7 @@ describe('tool catalogue', () => {
       (count, category) => count + toolsByCategory(category.id).length,
       0,
     );
-    expect(total).toBe(18);
+    expect(total).toBe(TOOLS.length);
   });
 
   it('marks translate as implemented and the client-side apps as browser-only', () => {
