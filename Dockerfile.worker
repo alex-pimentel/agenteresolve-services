@@ -4,7 +4,7 @@
 # The media pipeline runs self-contained: the optional `worker[*]` extras are installed
 # here plus the system packages they need (tesseract-ocr for OCR, ffmpeg for audio,
 # libsndfile1/espeak-ng data for Piper TTS, OpenGL/vips libs for Pillow + OpenCV).
-FROM python:3.12-slim AS base
+FROM python:3.14-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
