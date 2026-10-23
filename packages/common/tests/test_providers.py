@@ -108,14 +108,6 @@ def test_key_present_sends_authorization_header(monkeypatch: pytest.MonkeyPatch)
 def test_http_error_is_wrapped_as_provider_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     import httpx
 
-    class _ErrorResponse:
-        status_code = 503
-        text = '{"detail":"local LLM failed"}'
-
-        def raise_for_status(self) -> None:
-            request = httpx.Request("POST", "https://example.com/v1/chat/completions")
-            raise httpx.HTTPStatusError("503 Service Unavailable", request=request, response=self)
-
     class _ErrorClient:
         def __init__(self, **kwargs: object) -> None:
             pass
@@ -126,8 +118,11 @@ def test_http_error_is_wrapped_as_provider_unavailable(monkeypatch: pytest.Monke
         def __exit__(self, *args: object) -> None:
             return None
 
-        def post(self, *args: object, **kwargs: object) -> _ErrorResponse:
-            return _ErrorResponse()
+        def post(
+            self, url: str, json: object = None, headers: dict | None = None
+        ) -> httpx.Response:
+            request = httpx.Request("POST", url)
+            return httpx.Response(503, text='{"detail":"local LLM failed"}', request=request)
 
     monkeypatch.setattr("common.providers.llm.httpx.Client", _ErrorClient)
     llm = OpenAICompatibleLLM("https://example.com/v1", "secret", "m")
