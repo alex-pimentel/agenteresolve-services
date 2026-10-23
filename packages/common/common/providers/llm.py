@@ -57,11 +57,20 @@ class OpenAICompatibleLLM:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         with httpx.Client(timeout=self.timeout) as client:
-            response = client.post(
-                f"{self.base_url}/chat/completions", json=payload, headers=headers
-            )
-            response.raise_for_status()
-            data = response.json()
+            try:
+                response = client.post(
+                    f"{self.base_url}/chat/completions", json=payload, headers=headers
+                )
+                response.raise_for_status()
+                data = response.json()
+            except httpx.HTTPStatusError as exc:
+                detail = (exc.response.text or "")[:300].strip()
+                message = f"LLM HTTP {exc.response.status_code}"
+                if detail:
+                    message += f": {detail}"
+                raise ProviderUnavailable(message) from exc
+            except httpx.HTTPError as exc:
+                raise ProviderUnavailable(f"LLM request failed: {exc}") from exc
         content: str = data["choices"][0]["message"]["content"] or ""
         return content
 

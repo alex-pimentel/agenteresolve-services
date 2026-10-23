@@ -106,6 +106,21 @@ def test_alttext_without_llm_uses_caption() -> None:
     assert payload["alt"] == "a dog"
 
 
+def test_alttext_falls_back_to_caption_when_llm_is_unavailable() -> None:
+    def unavailable(**_: Any) -> str:
+        raise ProviderUnavailable("LLM offline")
+
+    ctx = _ctx(
+        vision=_Vision("a cat"),
+        llm=FakeLLM(unavailable),
+        params={"lang": "pt", "style": "accessible"},
+    )
+    payload = json.loads(handle_alttext(ctx).data)
+    assert payload["alt"] == "a cat"
+    assert payload["caption"] == ["a cat"]
+    assert payload["tags"] == []
+
+
 def test_alttext_requires_vision() -> None:
     with pytest.raises(ProviderUnavailable):
         handle_alttext(_ctx(llm=FakeLLM("x")))

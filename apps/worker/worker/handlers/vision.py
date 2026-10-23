@@ -94,7 +94,9 @@ def handle_alttext(ctx: HandlerContext) -> HandlerResult:
             alt = str(data.get("alt") or base)
             caption = [str(item) for item in data.get("caption", [])] or [base]
             tags = [str(item) for item in data.get("tags", [])]
-        except ValueError:
+        except (ValueError, ProviderUnavailable):
+            # O refinamento por LLM é opcional: se o provedor estiver fora ou a
+            # resposta não for JSON, mantemos a legenda local (BLIP).
             pass
 
     payload = {"alt": alt, "caption": caption, "tags": tags, "confidence": 0.8, "lang": lang}

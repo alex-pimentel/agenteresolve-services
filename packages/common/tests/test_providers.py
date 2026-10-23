@@ -105,6 +105,41 @@ def test_key_present_sends_authorization_header(monkeypatch: pytest.MonkeyPatch)
     assert captured["Authorization"] == "Bearer secret"
 
 
+def test_http_error_is_wrapped_as_provider_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+
+    class _ErrorResponse:
+        status_code = 503
+        text = '{"detail":"local LLM failed"}'
+
+        def raise_for_status(self) -> None:
+            request = httpx.Request("POST", "https://example.com/v1/chat/completions")
+            raise httpx.HTTPStatusError("503 Service Unavailable", request=request, response=self)
+
+    class _ErrorClient:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def __enter__(self) -> "_ErrorClient":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def post(self, *args: object, **kwargs: object) -> _ErrorResponse:
+            return _ErrorResponse()
+
+    monkeypatch.setattr("common.providers.llm.httpx.Client", _ErrorClient)
+    llm = OpenAICompatibleLLM("https://example.com/v1", "secret", "m")
+
+    with pytest.raises(ProviderUnavailable) as excinfo:
+        llm.complete("hi")
+
+    message = str(excinfo.value)
+    assert "503" in message
+    assert "local LLM failed" in message
+
+
 def test_factory_uses_remote_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LLM_BASE_URL", "https://example.com/v1")
     monkeypatch.setenv("LLM_API_KEY", "secret")
