@@ -35,7 +35,7 @@ vision = [
 ]
 # Local transcription/enhancement. `av<19` because faster-whisper 1.2.x uses an `av`
 # kwarg that av>=19 removed; ffmpeg is required on PATH (system package).
-audio = ["faster-whisper>=1.0", "av<19"]
+audio = ["faster-whisper>=1.0", "av<20"]
 # Local Piper TTS (needs `espeak-ng`/bundled data; voices download on first use).
 tts = ["piper-tts>=1.3"]
 
